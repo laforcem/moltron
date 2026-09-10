@@ -52,3 +52,27 @@
     - 'openclaw config set channels.telegram.dmPolicy "allowlist"'
     - 'openclaw config set channels.telegram.allowFrom ''["{{ telegram_allowed_user_id }}"]'''
   notify: Restart openclaw gateway
+
+- name: Register actual-mcp remote server
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - 'openclaw config set mcp.servers.actual.url "https://budget.{{ domain }}/mcp/http"'
+    - 'openclaw config set mcp.servers.actual.transport "streamable-http"'
+  notify: Restart openclaw gateway
+
+- name: Set actual-mcp auth header
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: >-
+      openclaw config set mcp.servers.actual.headers
+      '{"Authorization": "Bearer {{ actual_mcp_token }}"}'
+  no_log: true
+  notify: Restart openclaw gateway
