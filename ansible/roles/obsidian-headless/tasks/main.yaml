@@ -2,8 +2,8 @@
   become: true
   become_user: moltron
   ansible.builtin.command:
-    cmd: npm install -g obsidian-headless --prefix ~moltron/.npm-global
-    creates: /home/moltron/.npm-global/bin/ob
+    cmd: npm install -g obsidian-headless --prefix ~moltron/.local
+    creates: /home/moltron/.local/bin/ob
 
 - name: Create Obsidian sync systemd unit directory
   become: true
@@ -28,8 +28,8 @@
       [Service]
       Type=simple
       WorkingDirectory=/home/moltron/Obsidian
-      Environment=PATH=/home/moltron/.npm-global/bin:/usr/bin:/bin
-      ExecStart=/home/moltron/.npm-global/bin/ob sync --continuous
+      Environment=PATH=/home/moltron/.local/bin:/usr/bin:/bin
+      ExecStart=/home/moltron/.local/bin/ob sync --continuous
       Restart=on-failure
       RestartSec=10
       TimeoutStartSec=30

@@ -30,22 +30,14 @@
   become: true
   become_user: moltron
   ansible.builtin.command:
-    cmd: npm install -g openclaw@latest --allow-scripts=openclaw --prefix ~moltron/.npm-global
-    creates: /home/moltron/.npm-global/bin/openclaw
-
-- name: Add npm-global bin to moltron's PATH
-  become: true
-  become_user: moltron
-  ansible.builtin.lineinfile:
-    path: /home/moltron/.bashrc
-    line: 'export PATH="$HOME/.npm-global/bin:$PATH"'
-    create: true
+    cmd: npm install -g openclaw@latest --allow-scripts=openclaw --prefix ~moltron/.local
+    creates: /home/moltron/.local/bin/openclaw
 
 - name: Lock down Telegram to a single-user allowlist
   become: true
   become_user: moltron
   environment:
-    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
   ansible.builtin.command:
     cmd: "{{ item }}"
   loop:
@@ -57,7 +49,7 @@
   become: true
   become_user: moltron
   environment:
-    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
   ansible.builtin.command:
     cmd: "{{ item }}"
   loop:
@@ -69,7 +61,7 @@
   become: true
   become_user: moltron
   environment:
-    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
   ansible.builtin.command:
     cmd: >-
       openclaw config set mcp.servers.actual.headers
