@@ -68,3 +68,20 @@
       '{"Authorization": "Bearer {{ actual_mcp_token }}"}'
   no_log: true
   notify: Restart openclaw gateway
+
+- name: Install OpenMP runtime (required by the managed llama.cpp server)
+  ansible.builtin.apt:
+    name: libgomp1
+    state: present
+
+- name: Configure OpenClaw memory search to use local CPU embeddings
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - 'openclaw config set memory.search.provider "local"'
+    - 'openclaw config set memory.search.local.modelPath "embeddinggemma-300m-qat-Q8_0.gguf"'
+  notify: Restart openclaw gateway
