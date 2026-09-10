@@ -173,3 +173,12 @@ right and deserves its own brainstorm once this foundation exists.
   autonomously) is conceptual per the original brainstorm and not
   formalized here — this MVP's action surface (append a note, log one
   transaction) doesn't yet need it decided.
+- Relay (relay.md), used to share specific notes with the user's wife, is
+  exclusively an Obsidian plugin — it runs inside the real Obsidian
+  Electron app and has no standalone CLI/headless client. `obsidian-headless`
+  cannot participate in a Relay-shared folder; that's a separate sync
+  mechanism from Obsidian Sync entirely. The daily note this MVP targets is
+  not Relay-shared, so this doesn't block the MVP, but giving the assistant
+  write access to Relay-shared notes later would mean revisiting the
+  headless-only decision (e.g. running real Obsidian under Xvfb with the
+  Relay plugin installed) — its own design question, not a quick addition.
