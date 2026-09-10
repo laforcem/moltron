@@ -2,10 +2,9 @@
 # Each lookup below is added by the task that first needs it — see per-task steps
 # in docs/superpowers/plans/2026-09-10-moltron-mvp.md.
 
-# Not a secret (a Telegram user ID is not sensitive) — the bot token itself was
-# already captured during interactive `openclaw onboard` and lives only in
-# ~moltron/.openclaw/openclaw.json on the VM, not here.
-telegram_allowed_user_id: "REDACTED-TELEGRAM-USER-ID"
+# Not a Bitwarden secret, but still not something to commit literally — it
+# identifies a specific real Telegram account. Sourced from .env like DOMAIN.
+telegram_allowed_user_id: "{{ lookup('env', 'TELEGRAM_ALLOWED_USER_ID') }}"
 
 actual_mcp_token: "{{ lookup('bitwarden.secrets.lookup', '13904fb4-c588-4267-90de-b4c1010b1ae8') }}"
 domain: "{{ lookup('env', 'DOMAIN') }}"
