@@ -4,3 +4,4 @@
   roles:
     - moltron-user
     - openclaw
+    - obsidian-headless
