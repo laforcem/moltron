@@ -8,3 +8,5 @@ telegram_allowed_user_id: "{{ lookup('env', 'TELEGRAM_ALLOWED_USER_ID') }}"
 
 actual_mcp_token: "{{ lookup('bitwarden.secrets.lookup', '13904fb4-c588-4267-90de-b4c1010b1ae8') }}"
 domain: "{{ lookup('env', 'DOMAIN') }}"
+
+moltron_bot_pat: "{{ lookup('bitwarden.secrets.lookup', 'db72e78b-0a94-4600-94c7-b4c101244310') }}"
