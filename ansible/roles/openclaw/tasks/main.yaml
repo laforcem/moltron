@@ -10,6 +10,23 @@
     state: present
     update_cache: true
 
+- name: Install dbus-user-session (required for systemd --user gateway install)
+  ansible.builtin.apt:
+    name: dbus-user-session
+    state: present
+  register: dbus_user_session_install
+
+- name: Look up moltron's UID
+  ansible.builtin.getent:
+    database: passwd
+    key: moltron
+  when: dbus_user_session_install.changed
+
+- name: Restart moltron's user manager to pick up dbus-user-session
+  ansible.builtin.command:
+    cmd: "systemctl restart user@{{ ansible_facts.getent_passwd.moltron[1] }}.service"
+  when: dbus_user_session_install.changed
+
 - name: Install OpenClaw globally (as moltron)
   become: true
   become_user: moltron
