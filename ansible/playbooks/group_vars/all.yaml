@@ -10,3 +10,4 @@ actual_mcp_token: "{{ lookup('bitwarden.secrets.lookup', '13904fb4-c588-4267-90d
 domain: "{{ lookup('env', 'DOMAIN') }}"
 
 moltron_bot_pat: "{{ lookup('bitwarden.secrets.lookup', 'db72e78b-0a94-4600-94c7-b4c101244310') }}"
+moltron_bot_git_email: "{{ lookup('env', 'MOLTRON_BOT_GIT_EMAIL') }}"

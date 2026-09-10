@@ -1,0 +1,47 @@
+- name: Install git
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+
+- name: Install gh CLI signing key
+  ansible.builtin.get_url:
+    url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    dest: /usr/share/keyrings/githubcli-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add gh CLI apt repo
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') | regex_replace('aarch64', 'arm64') }} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+    filename: github-cli
+    state: present
+
+- name: Install gh
+  ansible.builtin.apt:
+    name: gh
+    state: present
+    update_cache: true
+
+- name: Set default git identity for moltron (moltron-bot — see README for per-commit override)
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - 'git config --global user.name "moltron-bot"'
+    - 'git config --global user.email "{{ moltron_bot_git_email }}"'
+
+- name: Authenticate gh as moltron-bot
+  become: true
+  become_user: moltron
+  ansible.builtin.shell: |
+    echo "{{ moltron_bot_pat }}" | gh auth login --with-token
+  no_log: true
+  register: gh_auth_result
+  changed_when: gh_auth_result.rc == 0
+
+- name: Wire gh as the git credential helper
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: gh auth setup-git
