@@ -1,0 +1,11 @@
+- name: Create dedicated moltron service user
+  ansible.builtin.user:
+    name: moltron
+    shell: /bin/bash
+    create_home: true
+    system: false
+
+- name: Enable lingering for moltron (systemd --user services survive logout)
+  ansible.builtin.command:
+    cmd: loginctl enable-linger moltron
+    creates: /var/lib/systemd/linger/moltron
