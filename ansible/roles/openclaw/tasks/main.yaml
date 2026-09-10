@@ -20,7 +20,6 @@
   ansible.builtin.getent:
     database: passwd
     key: moltron
-  when: dbus_user_session_install.changed
 
 - name: Restart moltron's user manager to pick up dbus-user-session
   ansible.builtin.command:
@@ -41,3 +40,15 @@
     path: /home/moltron/.bashrc
     line: 'export PATH="$HOME/.npm-global/bin:$PATH"'
     create: true
+
+- name: Lock down Telegram to a single-user allowlist
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.npm-global/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - 'openclaw config set channels.telegram.dmPolicy "allowlist"'
+    - 'openclaw config set channels.telegram.allowFrom ''["{{ telegram_allowed_user_id }}"]'''
+  notify: Restart openclaw gateway
