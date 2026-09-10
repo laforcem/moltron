@@ -69,6 +69,15 @@
   no_log: true
   notify: Restart openclaw gateway
 
+- name: Bind gateway to LAN for mobile app pairing
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: 'openclaw config set gateway.bind "lan"'
+  notify: Restart openclaw gateway
+
 - name: Install OpenMP runtime (required by the managed llama.cpp server)
   ansible.builtin.apt:
     name: libgomp1
