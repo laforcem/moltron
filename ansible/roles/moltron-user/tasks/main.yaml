@@ -1,3 +1,9 @@
+- name: "Install acl (required for become_user: moltron to work)"
+  ansible.builtin.apt:
+    name: acl
+    state: present
+    update_cache: true
+
 - name: Create dedicated moltron service user
   ansible.builtin.user:
     name: moltron

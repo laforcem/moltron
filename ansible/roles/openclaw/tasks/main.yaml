@@ -1,0 +1,26 @@
+- name: Install Node.js 24.x (nodesource)
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install nodejs
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+- name: Install OpenClaw globally (as moltron)
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: npm install -g openclaw@latest --allow-scripts=openclaw --prefix ~moltron/.npm-global
+    creates: /home/moltron/.npm-global/bin/openclaw
+
+- name: Add npm-global bin to moltron's PATH
+  become: true
+  become_user: moltron
+  ansible.builtin.lineinfile:
+    path: /home/moltron/.bashrc
+    line: 'export PATH="$HOME/.npm-global/bin:$PATH"'
+    create: true
