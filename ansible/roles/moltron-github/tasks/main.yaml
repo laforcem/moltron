@@ -31,17 +31,72 @@
     - 'git config --global user.name "moltron-bot"'
     - 'git config --global user.email "{{ moltron_bot_git_email }}"'
 
-- name: Authenticate gh as moltron-bot
+# gh auth login --with-token hard-requires classic-token scopes (repo, read:org,
+# gist) just to pass its own login validation, and fine-grained PATs can't write
+# to repos where moltron-bot is a collaborator rather than owner (a documented
+# GitHub limitation) — so authenticate via GH_TOKEN instead, which gh and git
+# both honor directly with no scope gate. moltron_bot_pat is a classic PAT
+# scoped to just public_repo.
+#
+# GH_TOKEN is exported in two places so it reaches both tools that share this
+# identity (see issue #2's discussion): ~/.profile covers login shells
+# (`sudo -u moltron -i`, matching how OpenClaw/Claude Code sessions are
+# expected to be entered) — note ~/.bashrc is the wrong file here, since
+# Debian's default ~/.bashrc early-returns for non-interactive shells and
+# wouldn't be sourced by a scripted/heredoc login. ~/.config/environment.d
+# covers systemd --user-managed services (e.g. openclaw-gateway.service, and
+# any future Claude Code unit), which don't go through a login shell at all.
+- name: Export GH_TOKEN in moltron's login shell profile
   become: true
   become_user: moltron
-  ansible.builtin.shell: |
-    echo "{{ moltron_bot_pat }}" | gh auth login --with-token
+  ansible.builtin.lineinfile:
+    path: /home/moltron/.profile
+    regexp: '^export GH_TOKEN='
+    line: 'export GH_TOKEN="{{ moltron_bot_pat }}"'
+    create: true
   no_log: true
-  register: gh_auth_result
-  changed_when: gh_auth_result.rc == 0
 
-- name: Wire gh as the git credential helper
+- name: Create moltron's systemd user environment.d directory
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.config/environment.d
+    state: directory
+    mode: "0700"
+
+- name: Export GH_TOKEN for moltron's systemd --user services
+  become: true
+  become_user: moltron
+  ansible.builtin.copy:
+    dest: /home/moltron/.config/environment.d/50-github.conf
+    mode: "0600"
+    content: "GH_TOKEN={{ moltron_bot_pat }}\n"
+  no_log: true
+  register: github_environment_d
+
+- name: Look up moltron's UID
+  ansible.builtin.getent:
+    database: passwd
+    key: moltron
+
+- name: Restart moltron's user manager to pick up GH_TOKEN
+  ansible.builtin.command:
+    cmd: "systemctl restart user@{{ ansible_facts.getent_passwd.moltron[1] }}.service"
+  when: github_environment_d.changed
+
+- name: Clear any prior credential helper entries for github.com (idempotency)
   become: true
   become_user: moltron
   ansible.builtin.command:
-    cmd: gh auth setup-git
+    cmd: git config --global --unset-all credential.https://github.com.helper
+  register: clear_helper
+  failed_when: clear_helper.rc not in [0, 5]
+  changed_when: clear_helper.rc == 0
+
+- name: Wire git's credential helper to read GH_TOKEN directly
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: >-
+      git config --global --add credential.https://github.com.helper
+      '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo password=$GH_TOKEN; }; f'
