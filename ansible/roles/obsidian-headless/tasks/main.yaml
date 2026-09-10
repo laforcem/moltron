@@ -27,7 +27,7 @@
 
       [Service]
       Type=simple
-      WorkingDirectory=/home/moltron/Obsidian
+      WorkingDirectory=/home/moltron/obsidian
       Environment=PATH=/home/moltron/.local/bin:/usr/bin:/bin
       ExecStart=/home/moltron/.local/bin/ob sync --continuous
       Restart=on-failure
@@ -42,6 +42,6 @@
   become: true
   become_user: moltron
   ansible.builtin.file:
-    path: /home/moltron/Obsidian
+    path: /home/moltron/obsidian
     state: directory
     mode: "0700"
