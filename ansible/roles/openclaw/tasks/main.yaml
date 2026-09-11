@@ -103,6 +103,15 @@
     port: "{{ openclaw_gateway_port | string }}"
     proto: tcp
 
+- name: Allow the Control UI's real origin through the gateway
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: 'openclaw config set gateway.controlUi.allowedOrigins ''["https://openclaw.lan.{{ domain }}"]'''
+  notify: Restart openclaw gateway
+
 - name: Install OpenMP runtime (required by the managed llama.cpp server)
   ansible.builtin.apt:
     name: libgomp1
