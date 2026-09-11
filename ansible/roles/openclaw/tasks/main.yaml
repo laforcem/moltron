@@ -126,6 +126,27 @@
     name: libgomp1
     state: present
 
+# `openclaw config set` only writes config; it doesn't fetch the model. The
+# actual download only happens inside the interactive `openclaw configure`
+# wizard, which Ansible can't drive, so without this task the gateway is
+# left pointed at a modelPath that never gets populated and memory search
+# silently degrades to keyword-only.
+- name: Create OpenClaw's default llama.cpp model cache directory
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.openclaw/models/llama.cpp
+    state: directory
+    mode: "0755"
+
+- name: Download EmbeddingGemma GGUF for local memory search
+  become: true
+  become_user: moltron
+  ansible.builtin.get_url:
+    url: https://huggingface.co/ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/resolve/main/embeddinggemma-300m-qat-Q8_0.gguf
+    dest: /home/moltron/.openclaw/models/llama.cpp/embeddinggemma-300m-qat-Q8_0.gguf
+    mode: "0644"
+
 - name: Configure OpenClaw memory search to use local CPU embeddings
   become: true
   become_user: moltron
