@@ -78,6 +78,31 @@
     cmd: 'openclaw config set gateway.bind "lan"'
   notify: Restart openclaw gateway
 
+- name: Enable gateway TLS (self-signed, terminated again by vm100's Caddy)
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: 'openclaw config set gateway.tls.enabled true'
+  notify: Restart openclaw gateway
+
+- name: Trust vm100 as the gateway's reverse proxy
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: 'openclaw config set gateway.trustedProxies ''["{{ openclaw_gateway_proxy_ip }}"]'''
+  notify: Restart openclaw gateway
+
+- name: Restrict gateway port to vm100 only
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ openclaw_gateway_proxy_ip }}"
+    port: "{{ openclaw_gateway_port | string }}"
+    proto: tcp
+
 - name: Install OpenMP runtime (required by the managed llama.cpp server)
   ansible.builtin.apt:
     name: libgomp1
