@@ -18,17 +18,55 @@
     mode: "0755"
 
 # Nightly, not stable: YouTube breaks yt-dlp's extractors often enough that
-# the stable channel (~monthly) lags too far behind. This is also the
-# standalone-binary form so `yt-dlp -U` (below) can self-update it — a
-# pip/apt install can't do that.
+# the stable channel (~monthly) lags too far behind. Nightly builds live in
+# a separate repo (yt-dlp-nightly-builds), not a "nightly" tag on the main
+# one. yt-dlp_linux (not the bare "yt-dlp" asset) is the fully standalone
+# PyInstaller binary with no Python dependency, so `yt-dlp -U` (below) can
+# self-update it independent of whatever Python happens to be on the host —
+# a pip/apt install can't self-update at all.
 - name: Install yt-dlp (nightly channel, standalone self-updating binary)
   become: true
   become_user: moltron
   ansible.builtin.get_url:
-    url: https://github.com/yt-dlp/yt-dlp/releases/download/nightly/yt-dlp
+    url: https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux
     dest: /home/moltron/.local/bin/yt-dlp
     mode: "0755"
     force: true
+
+# yt-dlp (Nov 2025+) needs an external JS runtime to solve YouTube's
+# signature challenges; without one, extraction silently degrades to
+# formats that often aren't downloadable at all. deno is what yt-dlp
+# enables by default (others are opt-in, since running arbitrary JS
+# pulled from YouTube is more contained in deno's sandboxed runtime).
+- name: Install unzip (required to unpack deno's release archive)
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+
+- name: Download deno (JS runtime yt-dlp requires for full YouTube extraction)
+  become: true
+  become_user: moltron
+  ansible.builtin.get_url:
+    url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
+    dest: /home/moltron/.local/deno.zip
+    mode: "0644"
+  register: deno_zip
+
+- name: Unpack deno into moltron's bin directory
+  become: true
+  become_user: moltron
+  ansible.builtin.unarchive:
+    src: /home/moltron/.local/deno.zip
+    dest: /home/moltron/.local/bin
+    remote_src: true
+  when: deno_zip.changed
+
+- name: Remove deno download archive
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.local/deno.zip
+    state: absent
 
 - name: Create moltron systemd user unit directory
   become: true
