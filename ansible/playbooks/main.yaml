@@ -4,5 +4,6 @@
   roles:
     - moltron-user
     - moltron-github
+    - claude-code
     - openclaw
     - obsidian-headless

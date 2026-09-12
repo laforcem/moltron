@@ -1,0 +1,37 @@
+# Installs the Claude Code CLI for moltron, independently of the openclaw
+# role's own Node.js install so this role works standalone regardless of
+# playbook ordering (see issue #17: this is the ACP-adapter's underlying
+# `claude` binary, needed before ACP/acpx or Remote Control can be tested).
+
+- name: Install Node.js 24.x (nodesource)
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install nodejs
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+- name: Install Claude Code globally (as moltron)
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: npm install -g @anthropic-ai/claude-code --prefix ~moltron/.local
+    creates: /home/moltron/.local/bin/claude
+
+# `claude auth login` (full claude.ai login, required for Remote Control —
+# `claude setup-token`'s long-lived token is explicitly rejected) needs
+# periodic manual relogin, so put `claude` on moltron's login-shell PATH the
+# same way moltron-github exports GH_TOKEN in .profile — covers `sudo -u
+# moltron -i` sessions used to run `claude auth login` by hand.
+- name: Add moltron's ~/.local/bin to login shell PATH
+  become: true
+  become_user: moltron
+  ansible.builtin.lineinfile:
+    path: /home/moltron/.profile
+    regexp: '^export PATH="\$HOME/\.local/bin'
+    line: 'export PATH="$HOME/.local/bin:$PATH"'
+    create: true
