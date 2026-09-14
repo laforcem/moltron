@@ -1,6 +1,10 @@
 - name: Configure Moltron valet workload
   hosts: valet
   become: true
+  pre_tasks:
+    - name: Set static hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
   roles:
     - moltron-user
     - moltron-github
