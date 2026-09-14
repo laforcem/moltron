@@ -37,18 +37,18 @@ Assumes this repo and `homelab` are checked out as sibling directories (not
 required for secrets anymore, but `homelab`'s own Terraform/Ansible still
 provision and harden the VM this repo configures). Ansible currently
 connects over the LAN (`192.168.10.105`), the same as `homelab`'s own
-Ansible connects to `constrainer` — administering `secretary` day to day
+Ansible connects to `warden` — administering `valet` day to day
 happens over Tailscale instead, per the design doc.
 
 ## GitHub identity
 
-The `moltron` service user on `secretary` has its own GitHub identity
+The `moltron` service user on `valet` has its own GitHub identity
 (`moltron-bot`, a plain machine-user account — see issue #2 for why not a
 GitHub App) with push access to `laforcem/moltron` and `laforcem/homelab`.
 Default `git config user.name`/`user.email` on that user are set to
 `moltron-bot`'s identity (a GitHub-issued noreply address, not a real inbox
 — both repos are public), since that's the account actually authenticating.
-Claude Code is not yet installed on `secretary` — when it is, it inherits
+Claude Code is not yet installed on `valet` — when it is, it inherits
 this same identity automatically since it runs as the same `moltron` user.
 
 Authenticated via a classic PAT (`public_repo` scope) delivered through

@@ -1,5 +1,5 @@
-- name: Configure Moltron secretary workload
-  hosts: secretary
+- name: Configure Moltron valet workload
+  hosts: valet
   become: true
   roles:
     - moltron-user

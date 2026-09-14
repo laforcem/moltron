@@ -2,5 +2,5 @@ all:
   vars:
     ansible_user: malc
   hosts:
-    secretary:
+    valet:
       ansible_host: 192.168.10.105
