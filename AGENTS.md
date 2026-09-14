@@ -11,13 +11,13 @@ Assistant workload configuration for **Moltron** — working name, expect this r
 Deliberate split:
 
 - **`laforcem/homelab`** owns the VM's *existence* only — Terraform provisioning and the same `common` Ansible role every other host gets (guest agent, unattended-upgrades, SSH hardening, `ufw`, Tailscale). `homelab`'s `docs/current-state.md` gets one line pointing here.
-- **This repo** owns everything that makes the box *the secretary* rather than a generic Debian host: the dedicated service user, OpenClaw install/config, `obsidian-headless`, MCP server registrations, Telegram bot config, and all assistant-specific docs/skills as they accumulate.
+- **This repo** owns everything that makes the box *the valet* rather than a generic Debian host: the dedicated service user, OpenClaw install/config, `obsidian-headless`, MCP server registrations, Telegram bot config, and all assistant-specific docs/skills as they accumulate.
 
 Sibling checkout assumed: this repo and `homelab` are expected side by side (see README) even though it's no longer required for secrets.
 
 ## Host
 
-- **secretary** (`192.168.10.105`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (mirrors `terraform/constrainer.tf`: 2 vCPU / 4GB RAM / 32GB disk, Debian 13 cloud-init template VMID 103). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
+- **valet** (`192.168.10.105`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (mirrors `terraform/warden.tf`: 2 vCPU / 4GB RAM / 32GB disk, Debian 13 cloud-init template VMID 103). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
 - A dedicated, non-`malc` Unix service user (`moltron`) runs OpenClaw on that host, created by this repo's Ansible (workload-specific, not something `homelab`'s `common` role provides).
 
 ## Secrets
@@ -40,7 +40,7 @@ Full details in README — don't duplicate here, but the short version: `moltron
 - Installed natively via Ansible (`npm install -g openclaw@latest`, then `openclaw gateway install` + a systemd `--user` unit) — not Docker/`doco-cd`, to match how `homelab`'s Ansible already handles host-level services like Tailscale.
 - Image understanding (receipt photos) is configured as a separate model from the main agent model, decoupled via `tools.media.image.preferredModel`.
 - Delegated coding work goes through `sessions_spawn` with `runtime: "acp"` targeting the Claude ACP adapter (genuine Claude Code sessions, `resumeSessionId` for cross-device handoff). Whether an ACP-spawned session interoperates with Claude Code's own Remote Control feature is **unverified** — active work on this lives on the `issue-17-acp-remote-control` branch/worktree.
-- Model choices (main agent model, image model, embedding backend for memory search) are live config, not fixed architecture — the running OpenClaw config on `secretary` is the source of truth, not this file or even `ansible/roles/openclaw` (not everything is Ansible-managed).
+- Model choices (main agent model, image model, embedding backend for memory search) are live config, not fixed architecture — the running OpenClaw config on `valet` is the source of truth, not this file or even `ansible/roles/openclaw` (not everything is Ansible-managed).
 
 ## Media tools (`ansible/roles/media-tools`)
 
@@ -49,7 +49,7 @@ Deliberately raw binaries, not ClawHub skills/plugins — evaluated the skill ec
 - **yt-dlp**: standalone binary from the **nightly** channel of `yt-dlp/yt-dlp-nightly-builds` (not stable, not apt/pip; nightly lives in a separate repo, not a tag on the main one) — YouTube breaks extractors often enough that yt-dlp's own maintainers recommend nightly for regular users, and stable's ~monthly cadence lags too far behind. Asset is `yt-dlp_linux`, the fully standalone PyInstaller build (not the bare `yt-dlp` asset, which needs a system Python). Installed to `/home/moltron/.local/bin/yt-dlp`, moltron-owned (not root), with a matching `systemd --user` timer (`yt-dlp-update.timer`, daily) running `yt-dlp -U` — the binary's own self-updater, which only works on this standalone form (pip/apt installs can't self-update). moltron owns it so the daily update runs unprivileged like everything else moltron runs, instead of needing a root-level periodic job just to keep one CLI tool current. To update on demand: `yt-dlp -U`.
 - **deno**: yt-dlp (Nov 2025+) needs an external JS runtime to solve YouTube's signature challenges — without one, extraction silently degrades to formats that often aren't even downloadable (confirmed by hand: real downloads failed with "Requested format is not available" until deno was installed). deno is what yt-dlp enables by default; other runtimes (node, bun, quickjs) are opt-in only, since deno sandboxes the arbitrary JS pulled from YouTube more safely. No official apt package exists (Deno's own docs say Debian/Ubuntu/Arch community packages lag), and npm-distributed deno is explicitly discouraged by Deno's own docs (slower startup) — so it's a one-time raw-binary install (`denoland/deno` GitHub release zip) to `/home/moltron/.local/bin/deno`, moltron-owned. Unlike yt-dlp, this doesn't need a self-update timer: the part that actually chases YouTube's changes is `yt-dlp-ejs`, which is bundled inside the yt-dlp binary itself (so it already rides yt-dlp's own nightly self-update) — deno itself only needs to clear a minimum version floor (2.3.0+) and isn't part of that arms race. To update on demand: `deno upgrade` (Deno's own built-in self-updater, replaces its own executable in place — same shape as `yt-dlp -U`).
 - No YouTube search/comments capability yet — `yt-dlp "ytsearchN:query" --dump-json` covers basic search without extra credentials if/when that's wanted; not wired up as of this writing.
-- Verified end-to-end on `secretary` 2026-09-11: real YouTube download via `yt-dlp`, JS challenge solved via deno (`[jsc:deno] Solving JS challenges using deno` in the log), output validated with `ffprobe`.
+- Verified end-to-end on `secretary` (since renamed to `valet`) 2026-09-11: real YouTube download via `yt-dlp`, JS challenge solved via deno (`[jsc:deno] Solving JS challenges using deno` in the log), output validated with `ffprobe`.
 
 ## Obsidian
 
