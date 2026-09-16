@@ -1,0 +1,126 @@
+- name: Install rclone
+  ansible.builtin.apt:
+    name: rclone
+    state: present
+    update_cache: true
+
+# rclone >=1.62 shells out to `fusermount3`, not the older `fusermount` —
+# without fuse3 installed, `rclone mount` fails immediately with
+# "failed to mount FUSE fs: fusermount: exec: fusermount3: executable file
+# not found in $PATH" (confirmed by hand on valet).
+- name: Install fuse3 (required by rclone mount)
+  ansible.builtin.apt:
+    name: fuse3
+    state: present
+
+- name: Look up moltron's UID
+  ansible.builtin.getent:
+    database: passwd
+    key: moltron
+
+- name: Create moltron rclone config directory
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.config/rclone
+    state: directory
+    mode: "0700"
+
+# Full-account Dropbox app (not App-Folder-scoped), dedicated to this mount
+# and separate from the existing Dropbox app used for backups. OAuth itself
+# is a one-time interactive step (`rclone authorize`) done by hand on a
+# machine with a browser — see docs/rclone-dropbox.md — Ansible only
+# consumes the resulting client id/secret/token, sourced from Bitwarden.
+- name: Render rclone.conf (Dropbox remote)
+  become: true
+  become_user: moltron
+  ansible.builtin.template:
+    src: rclone.conf.j2
+    dest: /home/moltron/.config/rclone/rclone.conf
+    mode: "0600"
+  no_log: true
+
+- name: Create Dropbox mount point
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/dropbox
+    state: directory
+    mode: "0700"
+
+- name: Create moltron systemd user unit directory
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.config/systemd/user
+    state: directory
+    mode: "0755"
+
+# --vfs-cache-mode writes: needed for correct read-write FUSE semantics
+# (partial writes/seeks would otherwise corrupt uploads); `full` would be
+# safer but needlessly duplicates the whole Dropbox account onto valet's
+# 32GB disk, and `off` only works for read-only use. --poll-interval trades
+# API call frequency against how fast Dropbox-side changes appear locally.
+# No --allow-other: only moltron ever touches this mount.
+- name: Install rclone Dropbox mount systemd service
+  become: true
+  become_user: moltron
+  ansible.builtin.copy:
+    dest: /home/moltron/.config/systemd/user/rclone-dropbox-mount.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=rclone FUSE mount of Dropbox
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      Environment=PATH=/usr/bin:/bin
+      ExecStart=/usr/bin/rclone mount dropbox: /home/moltron/dropbox \
+        --vfs-cache-mode writes \
+        --vfs-cache-max-size 1G \
+        --dir-cache-time 1m \
+        --poll-interval 30s \
+        --umask 077
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=default.target
+  notify: Reload moltron systemd user daemon
+
+- name: Flush handlers to pick up the new unit before enabling it
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start rclone Dropbox mount
+  become: true
+  become_user: moltron
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd.moltron[1] }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.getent_passwd.moltron[1] }}/bus"
+  ansible.builtin.systemd:
+    name: rclone-dropbox-mount.service
+    scope: user
+    enabled: true
+    state: started
+
+# Read-only checks only — do not write into the mount during setup.
+- name: Verify Dropbox mount is active
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: mountpoint -q /home/moltron/dropbox
+  changed_when: false
+
+- name: Verify Dropbox remote is reachable
+  become: true
+  become_user: moltron
+  environment:
+    PATH: "/home/moltron/.local/bin:/usr/bin:{{ ansible_env.PATH }}"
+    RCLONE_CONFIG: /home/moltron/.config/rclone/rclone.conf
+  ansible.builtin.command:
+    cmd: "rclone lsd dropbox:"
+  changed_when: false
+  register: rclone_lsd_check
+  no_log: true

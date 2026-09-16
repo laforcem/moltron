@@ -17,3 +17,16 @@ openclaw_gateway_port: 18789
 
 moltron_bot_pat: "{{ lookup('bitwarden.secrets.lookup', 'db72e78b-0a94-4600-94c7-b4c101244310') }}"
 moltron_bot_git_email: "{{ lookup('env', 'MOLTRON_BOT_GIT_EMAIL') }}"
+
+# Dedicated rclone Dropbox app (issue #35) — separate from the existing
+# Dropbox app used for backups. Full-account access, not App-Folder-scoped.
+# App key/secret come from the Dropbox App Console (Bitwarden items
+# dropbox_rclone_app_key / dropbox_rclone_app_secret); token comes from a
+# one-time interactive `rclone authorize` run by hand (see
+# docs/rclone-dropbox.md) — none of this can be produced headlessly by
+# Ansible. This "token" value must be the FULL JSON blob `rclone authorize`
+# prints (access_token + refresh_token + expiry, etc.), not a bare
+# access_token string — see docs/rclone-dropbox.md.
+dropbox_rclone_client_id: "{{ lookup('bitwarden.secrets.lookup', '620d89ff-b271-4970-97b2-b4c701484af0') }}"
+dropbox_rclone_client_secret: "{{ lookup('bitwarden.secrets.lookup', '54d2f46c-80fc-459c-b424-b4c701486737') }}"
+dropbox_rclone_token: "{{ lookup('bitwarden.secrets.lookup', '6eff6c94-c68d-4bd0-8351-b4c70149b33d') }}"
