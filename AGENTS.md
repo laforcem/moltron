@@ -59,11 +59,16 @@ Deliberately raw binaries, not ClawHub skills/plugins — evaluated the skill ec
 
 Registers the existing remote `actual-mcp` instance already deployed on `mrgutsy` (`budget.$DOMAIN/mcp`) as an MCP server — no second instance stood up here.
 
+## Dropbox (`ansible/roles/rclone-dropbox`)
+
+A durable, read-write `rclone mount` FUSE mount of the whole Dropbox account at `/home/moltron/dropbox`, for binary project artifacts — see `docs/rclone-dropbox.md` for the full credential setup, flag rationale, operational checks, and rollback. Deliberately separate from the *other* existing Dropbox integration, which is used for backups: separate dedicated Dropbox app, separate Bitwarden secrets, so a leak of one credential set doesn't expose the other. Dropbox OAuth token acquisition is a one-time interactive step (`rclone authorize`, needs a browser) that can't be done headlessly on `valet` — it's a manual prerequisite the human does before the three `dropbox_rclone_*` Bitwarden secrets exist for Ansible to consume; the placeholder UUIDs in `ansible/playbooks/group_vars/all.yaml` need updating once those secrets are created. `valet` is a real KVM/QEMU VM (not a container), so unprivileged FUSE mounts work with no extra `homelab`-side hardening changes needed.
+
 ## Open questions carried forward
 
 - ACP-spawned Claude Code / Claude Code Remote Control interop — being tested on `issue-17-acp-remote-control`.
 - Permanent name for the assistant/repo (currently "Moltron", explicitly provisional).
 - Consequential-action policy (what requires approval vs. runs autonomously) — not yet formalized; current action surface (append a note, log a transaction) doesn't need it yet.
+- `dropbox_rclone_client_id`/`dropbox_rclone_client_secret`/`dropbox_rclone_token` in `ansible/playbooks/group_vars/all.yaml` are placeholder UUIDs (issue #35) until the Dropbox app + Bitwarden secrets are created by hand.
 
 ## Local setup
 
