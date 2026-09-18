@@ -6,13 +6,14 @@
 # identifies a specific real Telegram account. Sourced from .env like DOMAIN.
 telegram_allowed_user_id: "{{ lookup('env', 'TELEGRAM_ALLOWED_USER_ID') }}"
 
-actual_mcp_token: "{{ lookup('bitwarden.secrets.lookup', '13904fb4-c588-4267-90de-b4c1010b1ae8') }}"
 domain: "{{ lookup('env', 'DOMAIN') }}"
 
-# vm100's LAN IP (homelab repo) — the only host allowed to reach the gateway
-# port directly, since its Caddy instance is what fronts it with TLS. See
-# docs/superpowers/specs/2026-09-11-openclaw-gateway-tls-design.md.
-openclaw_gateway_proxy_ip: "192.168.10.100"
+# warden's LAN IP (homelab repo) — the only host allowed to reach the gateway
+# port directly, since its Caddy instance is what fronts it with TLS. Moved
+# here from vm100 during the vm100->warden migration (homelab #86); see
+# docs/superpowers/specs/2026-09-11-openclaw-gateway-tls-design.md for the
+# original design (written when vm100 held this role).
+openclaw_gateway_proxy_ip: "192.168.10.12"
 openclaw_gateway_port: 18789
 
 moltron_bot_pat: "{{ lookup('bitwarden.secrets.lookup', 'db72e78b-0a94-4600-94c7-b4c101244310') }}"

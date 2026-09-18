@@ -36,7 +36,7 @@ ansible-playbook playbooks/main.yaml
 Assumes this repo and `homelab` are checked out as sibling directories (not
 required for secrets anymore, but `homelab`'s own Terraform/Ansible still
 provision and harden the VM this repo configures). Ansible currently
-connects over the LAN (`192.168.10.105`), the same as `homelab`'s own
+connects over the LAN (`192.168.10.14`), the same as `homelab`'s own
 Ansible connects to `warden` — administering `valet` day to day
 happens over Tailscale instead, per the design doc.
 
@@ -51,14 +51,9 @@ Default `git config user.name`/`user.email` on that user are set to
 Claude Code is not yet installed on `valet` — when it is, it inherits
 this same identity automatically since it runs as the same `moltron` user.
 
-Authenticated via a classic PAT (`public_repo` scope) delivered through
-Bitwarden Secrets Manager, exposed to `moltron` as `GH_TOKEN` — both in
-`~/.profile` (login shells) and `~/.config/environment.d/` (systemd --user
-services, so any future Claude Code unit inherits it too). Not a fine-grained
-PAT: those can't write to repos where the token owner is a collaborator
-rather than the owner, which ruled that option out here. Not `gh auth
-login`: it hard-requires classic-token scopes (`repo`, `read:org`, `gist`)
-the bot doesn't need or have.
+Authenticated via `gh`'s own native OAuth login, not a PAT — git's
+credential helper for both `github.com` and `gist.github.com` is
+`gh auth git-credential`.
 
 This is a default identity, not a fixed authorship policy. Override
 per-commit depending on how autonomous vs. supervised the work is:
