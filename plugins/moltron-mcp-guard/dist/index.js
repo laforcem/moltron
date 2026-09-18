@@ -31,7 +31,7 @@ function resolveSecretOrFail(entry, serverName, health, logger) {
 function checkAllowedHost(secretStoreId, requiredHost, serverName, logger) {
   let entries;
   try {
-    const raw = execFileSync("openclaw", ["secrets", "store", "list", "--json"], {
+    const raw = execFileSync(process.execPath, [process.argv[1], "secrets", "store", "list", "--json"], {
       encoding: "utf8",
       timeout: 1e4
     });

@@ -133,7 +133,10 @@ function checkAllowedHost(
 ): boolean {
   let entries: StoreListEntry[];
   try {
-    const raw = execFileSync("openclaw", ["secrets", "store", "list", "--json"], {
+    // Re-invoke the same openclaw entry point this Gateway process was
+    // itself launched with, rather than relying on "openclaw" being on
+    // PATH inside the Gateway's own environment (not guaranteed).
+    const raw = execFileSync(process.execPath, [process.argv[1], "secrets", "store", "list", "--json"], {
       encoding: "utf8",
       timeout: 10_000,
     });
