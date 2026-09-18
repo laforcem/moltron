@@ -28,11 +28,9 @@ def request_with_retry(
     session: requests.Session, method: str, url: str, **kwargs
 ) -> requests.Response:
     kwargs.setdefault("timeout", REQUEST_TIMEOUT_SECONDS)
-    last_response: requests.Response | None = None
 
     for attempt in range(MAX_RETRIES + 1):
         response = session.request(method, url, **kwargs)
-        last_response = response
 
         if response.status_code == 429:
             if attempt >= MAX_RETRIES:
@@ -56,5 +54,4 @@ def request_with_retry(
 
         return response
 
-    assert last_response is not None
-    return last_response
+    raise AssertionError("unreachable: loop always returns or raises")  # pragma: no cover

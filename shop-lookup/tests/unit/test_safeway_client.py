@@ -1,7 +1,7 @@
 import pytest
 
 from shop_lookup.cache import FileCache
-from shop_lookup.errors import SubscriptionKeyError
+from shop_lookup.errors import NotFoundError, SubscriptionKeyError
 from shop_lookup.models import Store
 from shop_lookup.safeway.client import SafewayPdpClient
 
@@ -53,3 +53,13 @@ def test_rejected_key_raises_subscription_key_error(
 
     with pytest.raises(SubscriptionKeyError):
         client.fetch_product(STORE, "960087216", use_cache=False)
+
+
+def test_404_raises_not_found(mocked_responses, tmp_path, fake_clock):
+    mocked_responses.add(mocked_responses.GET, PDP_URL, status=404)
+
+    cache = FileCache(base_dir=tmp_path, clock=fake_clock)
+    client = SafewayPdpClient(StaticKeyProvider(), cache=cache)
+
+    with pytest.raises(NotFoundError):
+        client.fetch_product(STORE, "nonexistent-bpn", use_cache=False)

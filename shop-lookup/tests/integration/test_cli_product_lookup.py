@@ -1,5 +1,6 @@
 import json
 
+import shop_lookup.cli as cli_module
 from shop_lookup.cli import main
 
 CONFIG_URL = "https://www.safeway.com/"
@@ -68,3 +69,17 @@ def test_locate_returns_multiple_results(mocked_responses, cache_dir, fixture_lo
     assert out["results"][0]["product"]["price"] == 4.99
     assert out["results"][0]["location"]["label"] == "Aisle 4"
     assert out["results"][0]["source"] == "safeway-search-api"
+
+
+def test_unexpected_exception_surfaces_as_internal_error(cache_dir, capsys, monkeypatch):
+    def boom(_args):
+        raise ValueError("something unrelated broke")
+
+    monkeypatch.setattr(cli_module, "_run_safeway_product", boom)
+
+    exit_code = main(["safeway", "product", "--store", "1000", "--bpn", "1"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert out["error"] == "internal"
+    assert "something unrelated broke" in out["message"]
