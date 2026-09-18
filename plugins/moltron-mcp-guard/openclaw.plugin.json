@@ -24,7 +24,22 @@
               "description": "\"network\": the real server is reached over HTTP(S). \"local-program\": OpenClaw would otherwise spawn the real program directly."
             },
             "secret": {
-              "type": "string",
+              "anyOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["source", "provider", "id"],
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "enum": ["env", "store", "file", "exec"]
+                    },
+                    "provider": { "type": "string" },
+                    "id": { "type": "string" }
+                  }
+                }
+              ],
               "description": "The credential to inject. Set this to a SecretRef object ({source, provider, id}) pointing at a protected entry in OpenClaw's own secret store — never a literal value."
             },
             "port": {
@@ -94,7 +109,8 @@
       "paths": [
         {
           "path": "servers.*.secret",
-          "expected": "string"
+          "expected": "string",
+          "ownerKind": "capability"
         }
       ]
     }
