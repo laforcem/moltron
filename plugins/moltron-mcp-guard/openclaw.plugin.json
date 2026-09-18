@@ -1,0 +1,92 @@
+{
+  "id": "moltron-mcp-guard",
+  "name": "Moltron MCP Guard",
+  "description": "Stands in between OpenClaw and real MCP servers so a credential never has to sit in mcp.servers.<name>.env/.headers in plaintext. Resolves each configured server's credential from OpenClaw's own protected secret store and injects it only on the way out — never into OpenClaw's own config, process environment, or any CLI/status output. Covers both network-based MCP servers (a relay) and locally-run-program ones (a supervised child process). Workaround for openclaw#76493 (mcp.servers.*.headers/env reject SecretRef objects); does not use registerMcpServerConnectionResolver, which is unconditionally requester-scoped and never fires for cron/subagent/heartbeat/public-gateway turns.",
+  "categories": ["other"],
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "servers": {
+        "type": "object",
+        "description": "One entry per MCP server this plugin protects. The key is the server name (matches the mcp.servers.<name> entry this is standing in for).",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "secret"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["network", "local-program"],
+              "description": "\"network\": the real server is reached over HTTP(S). \"local-program\": OpenClaw would otherwise spawn the real program directly."
+            },
+            "secret": {
+              "type": "string",
+              "description": "The credential to inject. Set this to a SecretRef object ({source, provider, id}) pointing at a protected entry in OpenClaw's own secret store — never a literal value."
+            },
+            "port": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "network only: fixed local port this server's relay listens on (127.0.0.1). Point mcp.servers.<name>.url at http://127.0.0.1:<port>/ instead of the real address."
+            },
+            "upstreamUrl": {
+              "type": "string",
+              "minLength": 1,
+              "description": "network only: the real server's URL."
+            },
+            "header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "network only: header name to inject the resolved credential into, e.g. Authorization."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "network only: optional literal prefix prepended to the resolved credential, e.g. \"Bearer \"."
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1,
+              "description": "local-program only: the real command to run, e.g. \"npx\"."
+            },
+            "args": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "local-program only: arguments for the real command."
+            },
+            "envVar": {
+              "type": "string",
+              "minLength": 1,
+              "description": "local-program only: environment variable name the real program expects the credential in."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "local-program only: working directory for the spawned program."
+            }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "servers": {
+      "label": "Protected MCP servers",
+      "help": "Each entry stands in for one mcp.servers.<name> entry, resolving its credential from OpenClaw's own secret store instead of storing it in mcp.servers directly.",
+      "advanced": true
+    }
+  },
+  "configContracts": {
+    "secretInputs": {
+      "bundledDefaultEnabled": false,
+      "paths": [
+        {
+          "path": "servers.*.secret",
+          "expected": "string"
+        }
+      ]
+    }
+  }
+}

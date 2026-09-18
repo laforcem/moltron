@@ -1,0 +1,17 @@
+{
+  "name": "moltron-mcp-guard",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Local OpenClaw plugin: stands in between OpenClaw and real MCP servers, resolving each one's credential from OpenClaw's own protected secret store instead of mcp.servers.<name>.env/.headers plaintext.",
+  "peerDependencies": {
+    "openclaw": ">=2026.9.4"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.9.4",
+      "minGatewayVersion": "2026.9.4"
+    }
+  }
+}
