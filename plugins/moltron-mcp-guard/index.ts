@@ -210,6 +210,13 @@ function startNetworkServer(
   const upstreamClient = upstream.protocol === "https:" ? https : http;
 
   const server = http.createServer((req, res) => {
+    req.on("error", (error) => {
+      ctx.logger.error(`moltron-mcp-guard: "${serverName}" client request error: ${String(error)}`);
+    });
+    res.on("error", (error) => {
+      ctx.logger.error(`moltron-mcp-guard: "${serverName}" client response error: ${String(error)}`);
+    });
+
     if (req.headers[TOKEN_HEADER] !== token) {
       res.writeHead(403, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "moltron-mcp-guard: missing or wrong local token" }));
@@ -249,6 +256,9 @@ function startNetworkServer(
         } else if (status < 400) {
           ctx.serviceHealth?.clearFailure();
         }
+        upstreamRes.on("error", (error) => {
+          ctx.logger.error(`moltron-mcp-guard: "${serverName}" upstream response error: ${String(error)}`);
+        });
         res.writeHead(status, upstreamRes.headers);
         upstreamRes.pipe(res);
       },
@@ -261,6 +271,12 @@ function startNetworkServer(
       }
     });
     req.pipe(proxyReq);
+  });
+
+  server.on("error", (error) => {
+    const message = `moltron-mcp-guard: "${serverName}" relay server error: ${String(error)}`;
+    ctx.logger.error(message);
+    ctx.serviceHealth?.reportFailure(new Error(message));
   });
 
   server.listen(entry.port, "127.0.0.1", () => {
@@ -317,7 +333,13 @@ function startLocalProgramServer(
   const socketPath = path.join(socketDir, `${serverName}.sock`);
   fs.rmSync(socketPath, { force: true });
 
+  const liveChildren = new Set<ChildProcessWithoutNullStreams>();
+
   const server = net.createServer((connection) => {
+    connection.on("error", (error) => {
+      ctx.logger.error(`moltron-mcp-guard: "${serverName}" connection error: ${String(error)}`);
+    });
+
     readTokenLine(connection, (presentedToken, rest) => {
       if (presentedToken !== token) {
         connection.destroy();
@@ -333,6 +355,9 @@ function startLocalProgramServer(
         env: buildChildEnv(entry, secret),
         stdio: ["pipe", "pipe", "pipe"],
       });
+      liveChildren.add(child);
+      child.stdin.on("error", () => {}); // EPIPE if the child exits mid-write; exit handler covers reporting
+      child.stdout.on("error", () => {});
 
       let stderrTail = "";
       child.stderr.on("data", (chunk: Buffer) => {
@@ -345,16 +370,22 @@ function startLocalProgramServer(
 
       const startedAt = Date.now();
       child.on("exit", (code) => {
+        liveChildren.delete(child);
         connection.destroy();
-        if (code !== 0 && Date.now() - startedAt < 10_000) {
+        if (code === 0) {
+          ctx.serviceHealth?.clearFailure();
+        } else if (Date.now() - startedAt < 10_000) {
           const message = `moltron-mcp-guard: "${serverName}" exited during startup (code ${code}) — likely a rejected credential or misconfiguration. Last output: ${stderrTail.trim() || "(none)"}`;
           ctx.logger.error(message);
           ctx.serviceHealth?.reportFailure(new Error(message));
-        } else if (code === 0) {
-          ctx.serviceHealth?.clearFailure();
+        } else {
+          ctx.logger.error(
+            `moltron-mcp-guard: "${serverName}" exited (code ${code}). Last output: ${stderrTail.trim() || "(none)"}`,
+          );
         }
       });
       child.on("error", (error) => {
+        liveChildren.delete(child);
         const message = `moltron-mcp-guard: "${serverName}" failed to start: ${String(error)}`;
         ctx.logger.error(message);
         ctx.serviceHealth?.reportFailure(new Error(message));
@@ -365,6 +396,12 @@ function startLocalProgramServer(
         if (!child.killed) child.kill();
       });
     });
+  });
+
+  server.on("error", (error) => {
+    const message = `moltron-mcp-guard: "${serverName}" bridge server error: ${String(error)}`;
+    ctx.logger.error(message);
+    ctx.serviceHealth?.reportFailure(new Error(message));
   });
 
   server.listen(socketPath, () => {
@@ -380,6 +417,10 @@ function startLocalProgramServer(
     close: () => {
       server.close();
       fs.rmSync(socketPath, { force: true });
+      for (const child of liveChildren) {
+        if (!child.killed) child.kill();
+      }
+      liveChildren.clear();
     },
   };
 }
