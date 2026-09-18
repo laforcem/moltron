@@ -17,14 +17,14 @@ Sibling checkout assumed: this repo and `homelab` are expected side by side (see
 
 ## Host
 
-- **valet** (`192.168.10.105`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (mirrors `terraform/warden.tf`: 2 vCPU / 4GB RAM / 32GB disk, Debian 13 cloud-init template VMID 103). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
+- **valet** (`192.168.10.14`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (mirrors `terraform/warden.tf`: 2 vCPU / 4GB RAM / 32GB disk, Debian 13 cloud-init template VMID 103). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
 - A dedicated, non-`malc` Unix service user (`moltron`) runs OpenClaw on that host, created by this repo's Ansible (workload-specific, not something `homelab`'s `common` role provides).
 
 ## Secrets
 
 Own Bitwarden Secrets Manager project, separate from `homelab`'s — a Telegram/actual-mcp/OpenAI secret leaking here shouldn't expose the Proxmox API token or Tailscale authkey, and vice versa. `ansible/.env` (gitignored, copy from `ansible/.env.example`) holds a machine-account access token scoped to *this* project only. See README for the exact env var names.
 
-The `moltron` service user's credentials are scoped to only what the current MVP needs (own Telegram bot token, own OpenAI/Codex OAuth credential, own `actual-mcp` token) — explicitly *not* the user's SSH keys, GitHub identity, or credentials for unrelated systems (Proxmox, NAS, network infra).
+The `moltron` service user's credentials are scoped to only what the workload currently needs (own Telegram bot token, own OpenAI/Codex OAuth credential, own `actual-mcp` token) — explicitly *not* the user's SSH keys, GitHub identity, or credentials for unrelated systems (Proxmox, NAS, network infra).
 
 ## GitHub identity (`moltron-bot`)
 
@@ -51,6 +51,12 @@ Deliberately raw binaries, not ClawHub skills/plugins — evaluated the skill ec
 - No YouTube search/comments capability yet — `yt-dlp "ytsearchN:query" --dump-json` covers basic search without extra credentials if/when that's wanted; not wired up as of this writing.
 - Verified end-to-end on `secretary` (since renamed to `valet`) 2026-09-11: real YouTube download via `yt-dlp`, JS challenge solved via deno (`[jsc:deno] Solving JS challenges using deno` in the log), output validated with `ffprobe`.
 
+## Browser automation (`ansible/roles/browser-tools`)
+
+OpenClaw's built-in browser tool (`docs.openclaw.ai/tools/browser`, bundled by default — not a ClawHub skill) gives the agent Chromium-driven browser automation: tab control, click/type/drag/select, snapshots, screenshots, PDFs. It auto-detects an existing Chromium-based browser on the host (search order: system default → Chrome → Brave → Edge → Chromium → Chrome Canary, per `/tools/browser/configuration`) rather than downloading its own binary, so a binary has to exist on `valet` first. On headless Linux with no display server, local managed profiles default to headless automatically — no Xvfb needed (unlike the Obsidian/Relay tradeoff below).
+
+This role installs only the `chromium` apt package for that auto-detect to find. It deliberately does **not** enable the tool in OpenClaw itself — that needs `"browser"` added to both `plugins.allow` and `tools.alsoAllow` in `openclaw.json`, done by hand on the box, same precedent as `actual-mcp` below (live OpenClaw config, not Ansible-managed).
+
 ## Obsidian
 
 `obsidian-headless` (no Electron, no Xvfb) keeps the vault synced to plain markdown on disk; OpenClaw appends to the daily note via direct file edits against that synced path rather than the bundled `obsidian` skill, which requires a running Obsidian GUI. Trade-off: no CLI search/backlink-safe writes/task management from the `obsidian` skill. **Relay** (used to share notes with the user's wife) only works inside real Obsidian — `obsidian-headless` cannot participate in a Relay-shared folder; giving the assistant access to Relay-shared notes later means revisiting this decision (e.g. real Obsidian under Xvfb).
@@ -69,6 +75,7 @@ A durable, read-write `rclone mount` FUSE mount of the whole Dropbox account at 
 - Permanent name for the assistant/repo (currently "Moltron", explicitly provisional).
 - Consequential-action policy (what requires approval vs. runs autonomously) — not yet formalized; current action surface (append a note, log a transaction) doesn't need it yet.
 - `dropbox_rclone_client_id`/`dropbox_rclone_client_secret`/`dropbox_rclone_token` in `ansible/playbooks/group_vars/all.yaml` are placeholder UUIDs (issue #35) until the Dropbox app + Bitwarden secrets are created by hand.
+- Browser-automation tool is not yet enabled in OpenClaw: `chromium` is installed (`ansible/roles/browser-tools`), but `plugins.allow`/`tools.alsoAllow` in `openclaw.json` still need `"browser"` added by hand on `valet`.
 
 ## Local setup
 
@@ -81,5 +88,5 @@ cd ansible && ansible-galaxy collection install -r requirements.yaml
 
 ## Conventions
 
-- Out of scope for the current MVP (don't build toward these without a new brainstorm first): Fastmail, GitHub PR workflow beyond `moltron-bot` auth, browser automation, RAG/knowledge-graph work, research-job orchestration, Parcel, Maps, meal planning, Music Assistant, Plex/Jellyfin, an Apple-world bridge, synchronous conversational voice.
+- Out of scope for now (don't build toward these without a new brainstorm first): Fastmail, GitHub PR workflow beyond `moltron-bot` auth, RAG/knowledge-graph work, research-job orchestration, Parcel, Maps, meal planning, Music Assistant, Plex/Jellyfin, an Apple-world bridge, synchronous conversational voice.
 - Follow `homelab`'s sanitization conventions for anything captured from a live system: no credentials, MAC addresses, or personal identifying info committed. Internal topology (VLANs, RFC1918 addresses) is fine.

@@ -1,0 +1,11 @@
+# OpenClaw's built-in browser-automation tool auto-detects an existing
+# Chromium-based browser on the host (system default, then Chrome, Brave,
+# Edge, Chromium, Chrome Canary) rather than downloading its own binary, so
+# nothing works until a real browser binary is present. `chromium` is
+# Debian's current package name (the old `chromium-browser` transitional
+# package no longer exists) and matches OpenClaw's fallback name exactly.
+- name: Install Chromium (browser binary for OpenClaw's browser-automation tool)
+  ansible.builtin.apt:
+    name: chromium
+    state: present
+    update_cache: true
