@@ -63,7 +63,30 @@ This role installs only the `chromium` apt package for that auto-detect to find.
 
 ## Actual
 
-Registers the existing remote `actual-mcp` instance already deployed on `mrgutsy` (`budget.$DOMAIN/mcp`) as an MCP server — no second instance stood up here.
+Uses the existing remote `actual-mcp` instance already deployed on `mrgutsy` (`budget.$DOMAIN/mcp`) — no second instance stood up here. Its `mcp.servers.actual` registration is **not** managed by this repo's Ansible: the user configures it directly on `valet`, through `moltron-mcp-guard` (see below), relying on OpenClaw's own backup/restore rather than committing it here.
+
+## Credential handling for integrations (moltron#32 / moltron#36)
+
+Two deliberately different policies, by credential shape:
+
+**Credentials for CLI tools OpenClaw runs itself** (a subscription key, an API token passed as a header): use OpenClaw's own built-in protected secret store (`openclaw secrets store`, or the Control UI's Settings → Secrets page) plus its destination-locked egress proxy (`secrets.egressProxy`). The tool gets a placeholder value; OpenClaw substitutes the real one only on the outbound hop to an explicitly allowed host. This is the standing default for this credential shape going forward — not Bitwarden. Doesn't cover non-HTTP protocols (a database connection, SSH) or anything run outside OpenClaw's own exec (sandboxed/remote-node exec).
+
+**Credentials for MCP servers** (Actual, Tandoor, and future ones): OpenClaw has no built-in equivalent for this — core's `mcp.servers.<name>.env`/`.headers` schema only accepts `string|number|boolean` (upstream `openclaw/openclaw#76493`, stalled, not worth waiting on), and the plugin API that looks like it should help (`registerMcpServerConnectionResolver`) is unconditionally *requester-scoped*: confirmed against OpenClaw's own tests that it never fires for cron/subagent/heartbeat/public-gateway turns, only chat-originated ones. Using it for an always-on integration would silently break every scheduled/background use — do not use it for this.
+
+The actual fix: `plugins/moltron-mcp-guard/`, a local OpenClaw plugin (ships from this repo like `media-tools`, but — unlike `media-tools` — **installed on `valet` by hand via `openclaw plugins install`, never by Ansible**; see the Ansible/OpenClaw boundary note below) that stands in between OpenClaw and each real MCP server:
+
+- **Network-shaped servers** (a URL + header, e.g. `actual`): the plugin runs a small persistent local relay (`api.registerService`). Core `mcp.servers.actual` points at `http://127.0.0.1:<port>/...` with no credential in it; the relay resolves the real value once and attaches it only on the outbound hop to the real server.
+- **Locally-run-program servers** (OpenClaw currently spawns the program directly and hands it a token via env, e.g. `tandoor`): the plugin spawns the real program itself, handing it the credential directly and privately, and bridges its stdio over a private local socket to a small, generic, credential-free command that ships with the plugin; core `mcp.servers.tandoor.command` runs that bridge instead of the real program.
+- Either way, the credential is a **protected** (`kind: secret`) entry in OpenClaw's own store, resolved via the plugin SDK's read-only resolver (`source: "store"`) — never `process.env`, never resolved config, never printable by any CLI/status command. Declares `configContracts.secretInputs.paths` (same mechanism the bundled `acpx` plugin uses for its own MCP `env`) so these fields are audit/reload-aware, and a `reload: { configPrefixes: [...] }` on the service so a rotated credential is picked up without a full Gateway restart.
+- Config-driven and extensible: adding a future integration of either shape is one entry in the plugin's own config list, not a code change.
+- Fails loudly with two distinct messages — "no credential resolvable" vs. "credential resolved but the real service rejected it" — surfaced through OpenClaw's own status/health output, never a generic/opaque failure.
+- Confirmed live: Codex/ACP-bridged sessions don't keep a separate copy of MCP credentials — they translate the same core `mcp.servers.<name>` entry at session start, so fixing the core entry once covers both the main assistant and any Codex-spawned session.
+
+Was previously an abandoned first attempt (`moltron-mcp-secrets`) that used `registerMcpServerConnectionResolver` directly — discarded for the reason above, not reused.
+
+## Ansible/OpenClaw config boundary
+
+Ansible installs OpenClaw itself and supporting tooling only. It must never write to `openclaw.json`, register MCP servers, or touch the secret store — `valet` is treated as a pet, not cattle, and OpenClaw's own `backup`/`restore` (covers config, the secret store, and all other state, but explicitly *not* plugin code) is the intended recovery path for anything inside OpenClaw's own directory, not this repo's Ansible. A plugin's *code* still ships from this repo like any other tool here; getting it onto the box is a manual `openclaw plugins install`, run by hand, not an Ansible task. See [[openclaw-config-ownership]] and [[mcp-secrets-plugin]] memories for the running list of what's box-managed vs. Ansible-managed.
 
 ## Dropbox (`ansible/roles/rclone-dropbox`)
 

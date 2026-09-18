@@ -36,7 +36,7 @@ ansible-playbook playbooks/main.yaml
 Assumes this repo and `homelab` are checked out as sibling directories (not
 required for secrets anymore, but `homelab`'s own Terraform/Ansible still
 provision and harden the VM this repo configures). Ansible currently
-connects over the LAN (`192.168.10.105`), the same as `homelab`'s own
+connects over the LAN (`192.168.10.14`), the same as `homelab`'s own
 Ansible connects to `warden` — administering `valet` day to day
 happens over Tailscale instead, per the design doc.
 

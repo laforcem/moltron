@@ -45,30 +45,6 @@
     - 'openclaw config set channels.telegram.allowFrom ''["{{ telegram_allowed_user_id }}"]'''
   notify: Restart openclaw gateway
 
-- name: Register actual-mcp remote server
-  become: true
-  become_user: moltron
-  environment:
-    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
-  ansible.builtin.command:
-    cmd: "{{ item }}"
-  loop:
-    - 'openclaw config set mcp.servers.actual.url "https://budget.{{ domain }}/mcp/http"'
-    - 'openclaw config set mcp.servers.actual.transport "streamable-http"'
-  notify: Restart openclaw gateway
-
-- name: Set actual-mcp auth header
-  become: true
-  become_user: moltron
-  environment:
-    PATH: "/home/moltron/.local/bin:{{ ansible_env.PATH }}"
-  ansible.builtin.command:
-    cmd: >-
-      openclaw config set mcp.servers.actual.headers
-      '{"Authorization": "Bearer {{ actual_mcp_token }}"}'
-  no_log: true
-  notify: Restart openclaw gateway
-
 - name: Bind gateway to LAN for mobile app pairing
   become: true
   become_user: moltron
@@ -78,7 +54,7 @@
     cmd: 'openclaw config set gateway.bind "lan"'
   notify: Restart openclaw gateway
 
-- name: Enable gateway TLS (self-signed, terminated again by vm100's Caddy)
+- name: Enable gateway TLS (self-signed, terminated again by warden's Caddy)
   become: true
   become_user: moltron
   environment:
@@ -87,7 +63,7 @@
     cmd: 'openclaw config set gateway.tls.enabled true'
   notify: Restart openclaw gateway
 
-- name: Trust vm100 as the gateway's reverse proxy
+- name: Trust warden as the gateway's reverse proxy
   become: true
   become_user: moltron
   environment:
@@ -96,7 +72,7 @@
     cmd: 'openclaw config set gateway.trustedProxies ''["{{ openclaw_gateway_proxy_ip }}"]'''
   notify: Restart openclaw gateway
 
-- name: Restrict gateway port to vm100 only
+- name: Restrict gateway port to warden only
   community.general.ufw:
     rule: allow
     from_ip: "{{ openclaw_gateway_proxy_ip }}"
