@@ -16,12 +16,17 @@
         "additionalProperties": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "secret"],
+          "required": ["kind", "secret", "secretStoreId"],
           "properties": {
             "kind": {
               "type": "string",
               "enum": ["network", "local-program"],
               "description": "\"network\": the real server is reached over HTTP(S). \"local-program\": OpenClaw would otherwise spawn the real program directly."
+            },
+            "secretStoreId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The name of the entry in OpenClaw's secret store that `secret` resolves from (e.g. \"ACTUAL_MCP_TOKEN\") — used to look up and enforce that store entry's own allowed-hosts list. Must match the `id` inside the `secret` SecretRef."
             },
             "secret": {
               "anyOf": [
@@ -90,6 +95,10 @@
               "type": "object",
               "additionalProperties": { "type": "string" },
               "description": "local-program only: extra static (non-secret) environment variables the real program needs, e.g. a base URL. Not resolved as a secret input — plain literal values."
+            },
+            "expectedHost": {
+              "type": "string",
+              "description": "local-program only: the host this credential is expected to reach (e.g. the host in a TANDOOR_URL-style env var), checked against the store secret's allowed-hosts list. Omit to skip the check."
             }
           }
         }

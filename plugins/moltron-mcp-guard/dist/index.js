@@ -4,7 +4,7 @@ import * as net from "node:net";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 const TOKEN_HEADER = "x-moltron-guard-token";
 const DEFAULT_ENV_PASSTHROUGH = ["PATH", "HOME", "LANG", "TMPDIR"];
@@ -27,6 +27,28 @@ function resolveSecretOrFail(entry, serverName, health, logger) {
   logger.error(message);
   health?.reportFailure(new Error(message));
   return void 0;
+}
+function checkAllowedHost(secretStoreId, requiredHost, serverName, logger) {
+  let entries;
+  try {
+    const raw = execFileSync("openclaw", ["secrets", "store", "list", "--json"], {
+      encoding: "utf8",
+      timeout: 1e4
+    });
+    entries = JSON.parse(raw);
+  } catch (error) {
+    logger.error(
+      `moltron-mcp-guard: "${serverName}" could not read the secret store's allowed-hosts list: ${String(error)}`
+    );
+    return false;
+  }
+  const match = entries.find((e) => e.name === secretStoreId);
+  const allowedHosts = match?.allowedHosts ?? [];
+  if (allowedHosts.includes(requiredHost)) return true;
+  logger.error(
+    `moltron-mcp-guard: "${serverName}" refusing to use "${secretStoreId}" \u2014 its allowed-hosts list (${allowedHosts.length > 0 ? allowedHosts.join(", ") : "none configured"}) does not include "${requiredHost}". Add it in Settings -> Secrets.`
+  );
+  return false;
 }
 function getOrCreateLocalToken(stateDir, serverName) {
   const dir = path.join(stateDir, "moltron-mcp-guard");
@@ -52,9 +74,16 @@ function buildChildEnv(entry, secret) {
   return env;
 }
 function startNetworkServer(serverName, entry, ctx) {
-  const secret = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
-  const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const upstream = new URL(entry.upstreamUrl);
+  const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const hostAllowed = checkAllowedHost(entry.secretStoreId, upstream.hostname, serverName, ctx.logger);
+  if (resolved && !hostAllowed) {
+    ctx.serviceHealth?.reportFailure(
+      new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`)
+    );
+  }
+  const secret = resolved && hostAllowed ? resolved : void 0;
+  const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const upstreamClient = upstream.protocol === "https:" ? https : http;
   const server = http.createServer((req, res) => {
     if (req.headers[TOKEN_HEADER] !== token) {
@@ -130,7 +159,14 @@ function readTokenLine(connection, onResult) {
   connection.on("data", onData);
 }
 function startLocalProgramServer(serverName, entry, ctx) {
-  const secret = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const hostAllowed = entry.expectedHost ? checkAllowedHost(entry.secretStoreId, entry.expectedHost, serverName, ctx.logger) : true;
+  if (resolved && !hostAllowed) {
+    ctx.serviceHealth?.reportFailure(
+      new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`)
+    );
+  }
+  const secret = resolved && hostAllowed ? resolved : void 0;
   const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const socketDir = path.join(ctx.stateDir, "moltron-mcp-guard");
   fs.mkdirSync(socketDir, { recursive: true, mode: 448 });

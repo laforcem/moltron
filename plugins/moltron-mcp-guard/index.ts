@@ -8,7 +8,7 @@ import * as net from "node:net";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import type {
   OpenClawPluginApi,
@@ -40,6 +40,10 @@ import type {
 type NetworkServerEntry = {
   kind: "network";
   secret: string;
+  /** Store entry name the `secret` SecretRef resolves from — kept separately since core
+   * replaces `secret` with its resolved plaintext before this plugin ever sees it, and the
+   * allowed-hosts check needs the original entry name to look up. */
+  secretStoreId: string;
   port: number;
   upstreamUrl: string;
   header: string;
@@ -49,6 +53,7 @@ type NetworkServerEntry = {
 type LocalProgramServerEntry = {
   kind: "local-program";
   secret: string;
+  secretStoreId: string;
   command: string;
   args?: string[];
   envVar: string;
@@ -57,6 +62,9 @@ type LocalProgramServerEntry = {
   passthroughEnv?: string[];
   /** Extra static (non-secret) environment variables the real program needs, e.g. a URL. */
   env?: Record<string, string>;
+  /** Host the credential is expected to reach (e.g. the host in a TANDOOR_URL-style env var),
+   * checked against the store secret's allowed-hosts list. Omit to skip the check. */
+  expectedHost?: string;
 };
 
 type ServerEntry = NetworkServerEntry | LocalProgramServerEntry;
@@ -107,6 +115,46 @@ function resolveSecretOrFail(
   return undefined;
 }
 
+type StoreListEntry = { name: string; allowedHosts?: string[] };
+
+// Cross-checks the destination host this entry will actually send the
+// credential to against the allowed-hosts list configured on the secret
+// itself in OpenClaw's own store (Settings -> Secrets). That list is the
+// operator-visible, single source of truth for "where is this credential
+// allowed to go" — this plugin's own upstreamUrl/env config shouldn't be
+// trusted as the only guard against a future misconfiguration pointing a
+// server entry at the wrong place. No allowed hosts configured, or the
+// target host missing from the list, both fail closed.
+function checkAllowedHost(
+  secretStoreId: string,
+  requiredHost: string,
+  serverName: string,
+  logger: OpenClawPluginServiceContext["logger"],
+): boolean {
+  let entries: StoreListEntry[];
+  try {
+    const raw = execFileSync("openclaw", ["secrets", "store", "list", "--json"], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    entries = JSON.parse(raw) as StoreListEntry[];
+  } catch (error) {
+    logger.error(
+      `moltron-mcp-guard: "${serverName}" could not read the secret store's allowed-hosts list: ${String(error)}`,
+    );
+    return false;
+  }
+  const match = entries.find((e) => e.name === secretStoreId);
+  const allowedHosts = match?.allowedHosts ?? [];
+  if (allowedHosts.includes(requiredHost)) return true;
+  logger.error(
+    `moltron-mcp-guard: "${serverName}" refusing to use "${secretStoreId}" — its allowed-hosts list (${
+      allowedHosts.length > 0 ? allowedHosts.join(", ") : "none configured"
+    }) does not include "${requiredHost}". Add it in Settings -> Secrets.`,
+  );
+  return false;
+}
+
 // One random token per server, generated on first use and reused across
 // restarts (so the operator only has to copy it into mcp.servers.<name> once).
 // Low-sensitivity by design: it only gates access to this local stand-in, it
@@ -146,9 +194,16 @@ function startNetworkServer(
   entry: NetworkServerEntry,
   ctx: OpenClawPluginServiceContext,
 ): { close(): void } {
-  const secret = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
-  const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const upstream = new URL(entry.upstreamUrl);
+  const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const hostAllowed = checkAllowedHost(entry.secretStoreId, upstream.hostname, serverName, ctx.logger);
+  if (resolved && !hostAllowed) {
+    ctx.serviceHealth?.reportFailure(
+      new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`),
+    );
+  }
+  const secret = resolved && hostAllowed ? resolved : undefined;
+  const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const upstreamClient = upstream.protocol === "https:" ? https : http;
 
   const server = http.createServer((req, res) => {
@@ -243,7 +298,16 @@ function startLocalProgramServer(
   entry: LocalProgramServerEntry,
   ctx: OpenClawPluginServiceContext,
 ): { close(): void } {
-  const secret = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
+  const hostAllowed = entry.expectedHost
+    ? checkAllowedHost(entry.secretStoreId, entry.expectedHost, serverName, ctx.logger)
+    : true;
+  if (resolved && !hostAllowed) {
+    ctx.serviceHealth?.reportFailure(
+      new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`),
+    );
+  }
+  const secret = resolved && hostAllowed ? resolved : undefined;
   const token = getOrCreateLocalToken(ctx.stateDir, serverName);
   const socketDir = path.join(ctx.stateDir, "moltron-mcp-guard");
   fs.mkdirSync(socketDir, { recursive: true, mode: 0o700 });
