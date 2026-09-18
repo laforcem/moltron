@@ -1,3 +1,7 @@
+// `openclaw plugins install` needs compiled JS for a TypeScript entry — the
+// raw-.ts fallback only works for a source-checkout/dev path, not a normal
+// install. After editing this file, rebuild with:
+//   npx esbuild index.ts --outfile=dist/index.js --format=esm --platform=node --target=node22
 import * as http from "node:http";
 import * as https from "node:https";
 import * as net from "node:net";

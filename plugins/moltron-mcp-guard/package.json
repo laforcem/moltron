@@ -8,7 +8,7 @@
     "openclaw": ">=2026.9.4"
   },
   "openclaw": {
-    "extensions": ["./index.ts"],
+    "extensions": ["./dist/index.js"],
     "compat": {
       "pluginApi": ">=2026.9.4",
       "minGatewayVersion": "2026.9.4"
