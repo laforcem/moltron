@@ -70,6 +70,11 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "local-program only: extra environment variable names to pass through to the spawned program verbatim, beyond the minimal default set (PATH, HOME, LANG, TMPDIR). The program does not inherit the rest of OpenClaw's own environment."
+            },
+            "env": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "local-program only: extra static (non-secret) environment variables the real program needs, e.g. a base URL. Not resolved as a secret input — plain literal values."
             }
           }
         }

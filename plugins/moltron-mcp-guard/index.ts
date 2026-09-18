@@ -51,6 +51,8 @@ type LocalProgramServerEntry = {
   cwd?: string;
   /** Extra process.env keys to pass through verbatim, beyond the minimal default set. */
   passthroughEnv?: string[];
+  /** Extra static (non-secret) environment variables the real program needs, e.g. a URL. */
+  env?: Record<string, string>;
 };
 
 type ServerEntry = NetworkServerEntry | LocalProgramServerEntry;
@@ -130,6 +132,7 @@ function buildChildEnv(
     const value = process.env[key];
     if (value !== undefined) env[key] = value;
   }
+  Object.assign(env, entry.env ?? {});
   env[entry.envVar] = secret;
   return env;
 }
