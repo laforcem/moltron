@@ -1,0 +1,18 @@
+{
+  "catalog": {
+    "response": {
+      "docs": [
+        {
+          "name": "Seasonal Item Currently Out of Stock",
+          "pid": "555666777",
+          "availability": "OUT_OF_STOCK",
+          "departmentName": "Frozen",
+          "aisleName": "Frozen Foods",
+          "aisleId": "20",
+          "shelfName": "Frozen Vegetables",
+          "aisleLocation": "Aisle 20"
+        }
+      ]
+    }
+  }
+}

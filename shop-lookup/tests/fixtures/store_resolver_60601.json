@@ -1,0 +1,35 @@
+{
+  "delivery": {"stores": []},
+  "instore": {
+    "stores": [
+      {
+        "locationId": "1000",
+        "distance": 2.0,
+        "domainName": "Safeway",
+        "address": {
+          "line1": "1 Test Plaza",
+          "city": "Chicago",
+          "state": "IL",
+          "country": "US",
+          "zipcode": "60601"
+        },
+        "localPage": "https://local.safeway.com/safeway/il/chicago/1-test-plaza.html"
+      },
+      {
+        "locationId": "1001",
+        "distance": 5.4,
+        "domainName": "Safeway",
+        "address": {
+          "line1": "2 Test Plaza",
+          "city": "Chicago",
+          "state": "IL",
+          "country": "US",
+          "zipcode": "60602"
+        },
+        "localPage": "https://local.safeway.com/safeway/il/chicago/2-test-plaza.html"
+      }
+    ]
+  },
+  "pickup": {"stores": []},
+  "errors": []
+}

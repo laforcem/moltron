@@ -1,0 +1,12 @@
+{
+  "catalog": {
+    "response": {
+      "docs": [
+        {
+          "availability": "IN_STOCK",
+          "departmentName": "Condiments, Spice & Bake"
+        }
+      ]
+    }
+  }
+}

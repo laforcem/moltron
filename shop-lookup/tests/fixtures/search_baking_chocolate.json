@@ -1,0 +1,40 @@
+{
+  "response": {"numFound": 1631},
+  "primaryProducts": {
+    "response": {
+      "numFound": 1631,
+      "docs": [
+        {
+          "pid": "960152740",
+          "name": "Enjoy Life Baking Chocolate Dark Chocolate Morsels Bag - 9 Oz",
+          "status": "ACTIVE",
+          "departmentName": "Condiments, Spice & Bake",
+          "aisleName": "Baking Ingredients",
+          "aisleId": "12",
+          "aisleLocation": "Aisle 4",
+          "shelfName": "Chocolate Baking Bars",
+          "price": 4.99,
+          "basePrice": 4.99,
+          "pricePer": "each",
+          "inventoryAvailable": true,
+          "storeId": "1000"
+        },
+        {
+          "pid": "113400029",
+          "name": "Nestle Toll House Semi Sweet Chocolate Chips - 12 Oz",
+          "status": "ACTIVE",
+          "departmentName": "Condiments, Spice & Bake",
+          "aisleName": "Baking Ingredients",
+          "aisleId": "12",
+          "aisleLocation": "Aisle 4",
+          "shelfName": "Chocolate Baking Bars",
+          "price": 3.49,
+          "basePrice": 3.49,
+          "pricePer": "each",
+          "inventoryAvailable": true,
+          "storeId": "1000"
+        }
+      ]
+    }
+  }
+}

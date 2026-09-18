@@ -1,0 +1,21 @@
+{
+  "catalog": {
+    "response": {
+      "docs": [
+        {
+          "name": "Baker's Semi-Sweet Chocolate Premium Baking Bar with 56% Cacao - 4 Oz",
+          "pid": "960087216",
+          "availability": "IN_STOCK",
+          "departmentName": "Condiments, Spice & Bake",
+          "aisleName": "Baking Ingredients",
+          "aisleId": "12",
+          "shelfName": "Chocolate Baking Bars",
+          "aisleLocation": "Aisle 4",
+          "aisleUrl": "/shop/aisle/baking-ingredients",
+          "departmentUrl": "/shop/department/condiments-spice-bake",
+          "shelfUrl": "/shop/shelf/chocolate-baking-bars"
+        }
+      ]
+    }
+  }
+}

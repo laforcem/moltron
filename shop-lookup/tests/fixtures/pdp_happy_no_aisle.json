@@ -1,0 +1,18 @@
+{
+  "catalog": {
+    "response": {
+      "docs": [
+        {
+          "name": "Generic Store Brand Item",
+          "pid": "111222333",
+          "availability": "IN_STOCK",
+          "departmentName": "Miscellaneous",
+          "aisleName": null,
+          "aisleId": null,
+          "shelfName": null,
+          "aisleLocation": null
+        }
+      ]
+    }
+  }
+}

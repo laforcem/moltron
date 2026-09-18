@@ -69,6 +69,47 @@ Registers the existing remote `actual-mcp` instance already deployed on `mrgutsy
 
 A durable, read-write `rclone mount` FUSE mount of the whole Dropbox account at `/home/moltron/dropbox`, for binary project artifacts — see `docs/rclone-dropbox.md` for the full credential setup, flag rationale, operational checks, and rollback. Deliberately separate from the *other* existing Dropbox integration, which is used for backups: separate dedicated Dropbox app, separate Bitwarden secrets, so a leak of one credential set doesn't expose the other. Dropbox OAuth token acquisition is a one-time interactive step (`rclone authorize`, needs a browser) that can't be done headlessly on `valet` — it's a manual prerequisite the human does before the three `dropbox_rclone_*` Bitwarden secrets exist for Ansible to consume; the placeholder UUIDs in `ansible/playbooks/group_vars/all.yaml` need updating once those secrets are created. `valet` is a real KVM/QEMU VM (not a container), so unprivileged FUSE mounts work with no extra `homelab`-side hardening changes needed.
 
+## Shop-lookup (`shop-lookup/`)
+
+A small standalone Python CLI (`uv`-managed, not yet an Ansible role) that looks up a Safeway
+product's in-store aisle/department given a store and product ID (BPN), for the assistant to
+shell out to (`exec`) — same raw-CLI-over-MCP philosophy as `media-tools`: a narrow surface like
+this doesn't justify standing up an MCP server. JSON in, JSON out, no cart/account/auth flows ever.
+
+Safeway-only for now, deliberately no retailer-adapter abstraction/interface/registry — plain
+Safeway-specific modules plus a normalized `LookupResult` output shape. A second retailer (Whole
+Foods) would be the trigger to introduce that abstraction; don't build it preemptively.
+
+Out of scope for this phase, don't re-litigate without a new brainstorm:
+- Free-text product search (`locate <query>` / query-to-BPN resolution) — Safeway's
+  product-search endpoint (`xapi/pgmsearch/v1/search/products`) has since been captured
+  independently (anonymous, no cookies/`hhid` required, results already carry location fields
+  under `primaryProducts.response.docs[]`), but implementing the `locate` subcommand is a
+  separate follow-up phase, not folded into this one.
+- Cross-retailer price comparison.
+- Deploying this to `valet` via an Ansible role (`uv tool install`/`uv run` locally is enough
+  for now; role work is a separate future phase once the CLI is proven).
+- CI for this tool.
+
+Subscription-key handling (`ocp-apim-subscription-key`) is fetched dynamically at runtime from
+Safeway's own publicly-served client config by default — never hardcoded, never committed, never
+logged — with `SHOP_LOOKUP_SAFEWAY_SUBSCRIPTION_KEY` as a manual override (env var, not a CLI
+argument, to avoid shell-history/process-listing exposure) for when that dynamic fetch breaks.
+Cache TTLs and retry/backoff limits are hardcoded conservative in the library itself (`config.py`),
+not just documented, since this is public code.
+
+**Deliberately not built (deferred until actually needed):** automatic key-rotation
+recovery — discovering this key required two rounds of live browser-based reverse engineering
+(content-hashed Next.js chunk filenames that change per deploy, multiple misleadingly-named
+env branches where the "obviously right" one wasn't the live one, no known rotation cadence).
+That's an investigative task suited to an agent with browser tooling, not a stable target for
+hardcoded scraping/parsing logic that would silently rot on the next frontend redeploy. We
+haven't observed the key actually rotate or break yet, so building automated recovery for it
+now would be solving an unconfirmed problem. If/when it does break: a 401/403 surfaces as a
+clear `subscription_key_invalid` error (exit 5); recovery today is manual (find a working key,
+set the env var above) or, later, a documented runbook/skill for an agent with browser access
+to do the same.
+
 ## Open questions carried forward
 
 - ACP-spawned Claude Code / Claude Code Remote Control interop — being tested on `issue-17-acp-remote-control`.
