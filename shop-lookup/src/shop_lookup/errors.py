@@ -63,3 +63,15 @@ class SubscriptionKeyError(ShopLookupError):
 
     exit_code = 5
     kind = "subscription_key_invalid"
+
+
+class BrowserBlockedError(ShopLookupError):
+    """The real-browser fallback fetch was also met with an Incapsula challenge.
+
+    Distinct from SubscriptionKeyError: the key may be fine -- this is
+    Incapsula risk-scoring the browser's own IP/session, not rejecting the
+    key itself. Retrying immediately with the same key is unlikely to help.
+    """
+
+    exit_code = 6
+    kind = "still_blocked"

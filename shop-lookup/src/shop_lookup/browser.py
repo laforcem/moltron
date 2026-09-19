@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 
-from shop_lookup.errors import ShopLookupError
+from shop_lookup.errors import BrowserBlockedError, ShopLookupError
 
 # Prefer whatever real Chromium-family browser is already installed on this
 # host (e.g. the apt `chromium` package this repo's browser-tools role
@@ -60,6 +60,8 @@ class ChromiumFetcher:
 def _launch_and_fetch(  # pragma: no cover -- real-browser boundary, not unit-testable
     executable_path: str, bootstrap_url: str, url: str, headers: dict
 ) -> dict:
+    import json
+
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -67,12 +69,19 @@ def _launch_and_fetch(  # pragma: no cover -- real-browser boundary, not unit-te
         try:
             page = browser.new_page()
             page.goto(bootstrap_url)
-            return page.evaluate(
+            body = page.evaluate(
                 """async ({url, headers}) => {
                     const response = await fetch(url, {headers});
-                    return await response.json();
+                    return await response.text();
                 }""",
                 {"url": url, "headers": headers},
             )
         finally:
             browser.close()
+
+    if is_incapsula_challenge(body):
+        raise BrowserBlockedError(
+            "Real-browser fetch was also blocked by Incapsula -- likely "
+            "IP/session reputation, not the subscription key"
+        )
+    return json.loads(body)
