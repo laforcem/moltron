@@ -14,6 +14,8 @@ uv run shop-lookup safeway locate "apple" --store 1000
 
 Output is a single JSON object on stdout. A partial result (e.g. `location.label: null`) is still exit code 0 — check the body, not just the exit code, for whether a physical location was actually found.
 
+`product` and `locate` both accept `--from-json <path|->` instead of hitting the network: normalizes a raw pdpdata/search response you already have (e.g. fetched via a browser tool). See `docs/shop-lookup-live-fetch-recipe.md` at the repo root for why this exists — Safeway's bot mitigation blocks this CLI's own HTTP client outright.
+
 ## Exit codes
 
 | Code | Meaning |

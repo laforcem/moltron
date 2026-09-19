@@ -38,17 +38,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "product", help="Look up a product's in-store location by BPN"
     )
     product.add_argument("--store", required=True, help="Safeway store id")
-    product.add_argument("--bpn", required=True, help="Safeway product id (BPN)")
+    product.add_argument("--bpn", help="Safeway product id (BPN)")
     product.add_argument(
         "--no-cache", action="store_true", help="Bypass the local product-lookup cache"
+    )
+    product.add_argument(
+        "--from-json",
+        metavar="PATH",
+        help="Skip the network call; normalize a raw pdpdata response already "
+        "fetched elsewhere (e.g. via a browser tool). '-' reads stdin.",
     )
 
     locate = safeway_subparsers.add_parser(
         "locate", help="Fuzzy-search products by name, with price and location"
     )
-    locate.add_argument("query", help="Free-text product search, e.g. 'apple'")
+    locate.add_argument("query", nargs="?", help="Free-text product search, e.g. 'apple'")
     locate.add_argument("--store", required=True, help="Safeway store id")
     locate.add_argument("--limit", type=int, default=10, help="Max results (default 10)")
+    locate.add_argument(
+        "--from-json",
+        metavar="PATH",
+        help="Skip the network call; normalize a raw search response already "
+        "fetched elsewhere (e.g. via a browser tool). '-' reads stdin.",
+    )
 
     stores = safeway_subparsers.add_parser(
         "stores", help="Find nearby store numbers by zip code"
@@ -58,12 +70,23 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _read_json_input(path: str) -> dict:
+    text = sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
+    return json.loads(text)
+
+
 def _run_safeway_product(args: argparse.Namespace) -> dict:
     store = resolve_store(args.store)
-    key_provider = CachedSubscriptionKeyProvider(SubscriptionKeyProvider())
-    client = SafewayPdpClient(key_provider)
 
-    raw = client.fetch_product(store, args.bpn, use_cache=not args.no_cache)
+    if args.from_json:
+        raw = _read_json_input(args.from_json)
+    else:
+        if not args.bpn:
+            raise ShopLookupError("--bpn is required unless --from-json is given")
+        key_provider = CachedSubscriptionKeyProvider(SubscriptionKeyProvider())
+        client = SafewayPdpClient(key_provider)
+        raw = client.fetch_product(store, args.bpn, use_cache=not args.no_cache)
+
     fields = extract_product_fields(raw)
     result = to_lookup_result(store, fields)
     return result.to_json_dict()
@@ -71,10 +94,16 @@ def _run_safeway_product(args: argparse.Namespace) -> dict:
 
 def _run_safeway_locate(args: argparse.Namespace) -> dict:
     store = resolve_store(args.store)
-    key_provider = CachedSubscriptionKeyProvider(SubscriptionKeyProvider())
-    client = SafewaySearchClient(key_provider)
 
-    raw = client.search(store, args.query, rows=max(args.limit, 1))
+    if args.from_json:
+        raw = _read_json_input(args.from_json)
+    else:
+        if not args.query:
+            raise ShopLookupError("a search query is required unless --from-json is given")
+        key_provider = CachedSubscriptionKeyProvider(SubscriptionKeyProvider())
+        client = SafewaySearchClient(key_provider)
+        raw = client.search(store, args.query, rows=max(args.limit, 1))
+
     all_fields = extract_search_fields(raw)
     results = [
         to_lookup_result(store, fields, source="safeway-search-api").to_json_dict()

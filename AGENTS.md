@@ -80,16 +80,29 @@ Safeway-only for now, deliberately no retailer-adapter abstraction/interface/reg
 Safeway-specific modules plus a normalized `LookupResult` output shape. A second retailer (Whole
 Foods) would be the trigger to introduce that abstraction; don't build it preemptively.
 
+Ships `product` (by BPN), `locate` (fuzzy search via `xapi/pgmsearch/v1/search/products`,
+anonymous, no cookies/`hhid`), and `stores` (store locator by zip, `xapi/storeresolver/v2/all`) —
+no local store registry/aliases, keyed purely by Safeway's own store number. 100% unit test
+coverage, all HTTP mocked, no live network calls in the suite, no real store/address/zip data in
+any fixture (an earlier commit had real ones; history was rewritten to scrub it).
+
+**Safeway's bot mitigation (Incapsula) blocks this CLI's own HTTP client outright** for
+`pdpdata` and the search endpoint — confirmed: plain `requests`/`curl`, and even TLS-fingerprint
+spoofing (`curl_cffi` impersonating Chrome), all get an Incapsula challenge page instead of data.
+Only a real, JS-executing browser gets through; a persistent Playwright daemon was prototyped and
+proven (5/5 calls succeeded, ~300-450ms/call after one page load) but **rejected in favor of
+reusing OpenClaw's own browser tool** (already installed/enabled on `valet`) rather than standing
+up and operating a second, `shop-lookup`-specific Chromium stack. `product`/`locate` both accept
+`--from-json <path|->` to normalize a raw response fetched by the browser tool instead of making
+the network call themselves — see `docs/shop-lookup-live-fetch-recipe.md` for the exact recipe
+(navigate once, `fetch()` from within that page's JS context for subsequent calls).
+
 Out of scope for this phase, don't re-litigate without a new brainstorm:
-- Free-text product search (`locate <query>` / query-to-BPN resolution) — Safeway's
-  product-search endpoint (`xapi/pgmsearch/v1/search/products`) has since been captured
-  independently (anonymous, no cookies/`hhid` required, results already carry location fields
-  under `primaryProducts.response.docs[]`), but implementing the `locate` subcommand is a
-  separate follow-up phase, not folded into this one.
 - Cross-retailer price comparison.
 - Deploying this to `valet` via an Ansible role (`uv tool install`/`uv run` locally is enough
   for now; role work is a separate future phase once the CLI is proven).
 - CI for this tool.
+- A bespoke Playwright daemon for `shop-lookup` — deliberately rejected, see above.
 
 Subscription-key handling (`ocp-apim-subscription-key`) is fetched dynamically at runtime from
 Safeway's own publicly-served client config by default — never hardcoded, never committed, never

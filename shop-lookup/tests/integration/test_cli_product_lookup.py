@@ -1,3 +1,4 @@
+import io
 import json
 
 import shop_lookup.cli as cli_module
@@ -69,6 +70,50 @@ def test_locate_returns_multiple_results(mocked_responses, cache_dir, fixture_lo
     assert out["results"][0]["product"]["price"] == 4.99
     assert out["results"][0]["location"]["label"] == "Aisle 4"
     assert out["results"][0]["source"] == "safeway-search-api"
+
+
+def test_product_from_json_skips_network_entirely(
+    mocked_responses, cache_dir, fixture_loader, capsys, monkeypatch
+):
+    raw = fixture_loader("pdp_happy_with_aisle.json")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(raw)))
+
+    exit_code = main(["safeway", "product", "--store", "1000", "--from-json", "-"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert out["location"]["label"] == "Aisle 4"
+    assert len(mocked_responses.calls) == 0
+
+
+def test_locate_from_json_skips_network_entirely(
+    mocked_responses, cache_dir, fixture_loader, capsys, monkeypatch
+):
+    raw = fixture_loader("search_baking_chocolate.json")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(raw)))
+
+    exit_code = main(["safeway", "locate", "--store", "1000", "--from-json", "-"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert out["count"] == 2
+    assert len(mocked_responses.calls) == 0
+
+
+def test_product_without_bpn_or_from_json_is_an_error(cache_dir, capsys):
+    exit_code = main(["safeway", "product", "--store", "1000"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert "bpn" in out["message"]
+
+
+def test_locate_without_query_or_from_json_is_an_error(cache_dir, capsys):
+    exit_code = main(["safeway", "locate", "--store", "1000"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert "query" in out["message"]
 
 
 def test_unexpected_exception_surfaces_as_internal_error(cache_dir, capsys, monkeypatch):
