@@ -88,21 +88,32 @@ any fixture (an earlier commit had real ones; history was rewritten to scrub it)
 
 **Safeway's bot mitigation (Incapsula) blocks this CLI's own HTTP client outright** for
 `pdpdata` and the search endpoint — confirmed: plain `requests`/`curl`, and even TLS-fingerprint
-spoofing (`curl_cffi` impersonating Chrome), all get an Incapsula challenge page instead of data.
-Only a real, JS-executing browser gets through; a persistent Playwright daemon was prototyped and
-proven (5/5 calls succeeded, ~300-450ms/call after one page load) but **rejected in favor of
-reusing OpenClaw's own browser tool** (already installed/enabled on `valet`) rather than standing
-up and operating a second, `shop-lookup`-specific Chromium stack. `product`/`locate` both accept
-`--from-json <path|->` to normalize a raw response fetched by the browser tool instead of making
-the network call themselves — see `docs/shop-lookup-live-fetch-recipe.md` for the exact recipe
-(navigate once, `fetch()` from within that page's JS context for subsequent calls).
+spoofing (`curl_cffi` impersonating Chrome), all get an Incapsula challenge page instead of data
+(or, for search, the connection just hangs). Only a real, JS-executing browser gets through.
+
+Design history on how that's handled, since it moved twice:
+1. First idea: a persistent Playwright daemon holding one warm browser context. Prototyped and
+   proven (5/5 calls succeeded, ~300-450ms/call after one page load) but rejected — a second,
+   `shop-lookup`-specific Chromium stack (bundled/downloaded browser + a service to babysit) was
+   more to own than reusing OpenClaw's already-installed/enabled browser tool.
+2. Second idea: lean entirely on OpenClaw's browser tool, with `shop-lookup` gaining
+   `--from-json <path|->` to normalize whatever raw response the agent fetched that way.
+3. **Landed here**: `shop-lookup` bundles `playwright` (the automation *library*, not a
+   downloaded browser) and launches a short-lived headless instance of whatever real
+   Chromium-family browser is already on the host (`chromium`/`chromium-browser`/
+   `google-chrome[-stable]`/`brave-browser` on `$PATH`, or `SHOP_LOOKUP_CHROMIUM_PATH` override —
+   the same apt `chromium` the browser-tools role installs works). `product`/`locate` try the
+   plain HTTP path first and transparently fall back to this on a detected Incapsula challenge or
+   a hung connection — no separate flag needed, no daemon, no second browser binary on disk.
+   `--from-json` from idea 2 stays as a manual escape hatch (skips both the HTTP attempt and the
+   browser fallback) but isn't the primary path anymore.
 
 Out of scope for this phase, don't re-litigate without a new brainstorm:
 - Cross-retailer price comparison.
 - Deploying this to `valet` via an Ansible role (`uv tool install`/`uv run` locally is enough
   for now; role work is a separate future phase once the CLI is proven).
 - CI for this tool.
-- A bespoke Playwright daemon for `shop-lookup` — deliberately rejected, see above.
+- A persistent browser daemon — deliberately rejected, see above (idea 1).
 
 Subscription-key handling (`ocp-apim-subscription-key`) is fetched dynamically at runtime from
 Safeway's own publicly-served client config by default — never hardcoded, never committed, never

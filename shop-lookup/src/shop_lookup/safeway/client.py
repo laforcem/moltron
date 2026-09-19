@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import requests
 
+from shop_lookup.browser import ChromiumFetcher, is_incapsula_challenge
 from shop_lookup.cache import FileCache
 from shop_lookup.config import PRODUCT_LOOKUP_CACHE_TTL_SECONDS
 from shop_lookup.errors import NotFoundError, SubscriptionKeyError
@@ -18,10 +19,12 @@ class SafewayPdpClient:
         key_provider: CachedSubscriptionKeyProvider,
         session: requests.Session | None = None,
         cache: FileCache | None = None,
+        browser_fetcher=None,
     ):
         self._key_provider = key_provider
         self._session = session or requests.Session()
         self._cache = cache or FileCache()
+        self._browser_fetcher = browser_fetcher or ChromiumFetcher().fetch_json
 
     def fetch_product(self, store: Store, bpn: str, use_cache: bool = True) -> dict:
         cache_key = f"pdp:{store.id}:{bpn}"
@@ -53,15 +56,17 @@ class SafewayPdpClient:
                 f"No product found for bpn={bpn} at store {store.id}",
                 detail={"bpn": bpn, "store_id": store.id},
             )
-        if response.status_code in (401, 403):
+        if response.status_code in (401, 403) and is_incapsula_challenge(response.text):
+            raw = self._browser_fetcher(response.request.url, headers)
+        elif response.status_code in (401, 403):
             raise SubscriptionKeyError(
                 "Safeway rejected the subscription key -- it likely needs to be "
                 "refreshed (see AGENTS.md)",
                 detail={"status_code": response.status_code},
             )
-        response.raise_for_status()
-
-        raw = response.json()
+        else:
+            response.raise_for_status()
+            raw = response.json()
         if use_cache:
             self._cache.set(cache_key, raw, PRODUCT_LOOKUP_CACHE_TTL_SECONDS)
         return raw

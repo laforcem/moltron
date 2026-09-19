@@ -3,7 +3,7 @@ name = "shop-lookup"
 version = "0.1.0"
 description = "Local lookup of grocery product in-store locations, starting with Safeway."
 requires-python = ">=3.11"
-dependencies = ["requests>=2.31"]
+dependencies = ["requests>=2.31", "playwright>=1.45"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "responses>=0.25", "pytest-cov>=5.0"]

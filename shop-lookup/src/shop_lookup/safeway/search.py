@@ -5,6 +5,7 @@ import uuid
 
 import requests
 
+from shop_lookup.browser import ChromiumFetcher, is_incapsula_challenge
 from shop_lookup.errors import SubscriptionKeyError
 from shop_lookup.http import request_with_retry
 from shop_lookup.models import Store
@@ -18,9 +19,11 @@ class SafewaySearchClient:
         self,
         key_provider: CachedSubscriptionKeyProvider,
         session: requests.Session | None = None,
+        browser_fetcher=None,
     ):
         self._key_provider = key_provider
         self._session = session or requests.Session()
+        self._browser_fetcher = browser_fetcher or ChromiumFetcher().fetch_json
 
     def search(self, store: Store, query: str, rows: int = 10) -> dict:
         headers = {"ocp-apim-subscription-key": self._key_provider.get_key()}
@@ -46,10 +49,23 @@ class SafewaySearchClient:
             "request-id": str(random.randint(1, 10**9)),
         }
 
-        response = request_with_retry(
-            self._session, "GET", _SEARCH_URL, params=params, headers=headers
-        )
+        full_url = requests.Request(
+            "GET", _SEARCH_URL, params=params, headers=headers
+        ).prepare().url
 
+        try:
+            response = request_with_retry(
+                self._session, "GET", _SEARCH_URL, params=params, headers=headers
+            )
+        except requests.exceptions.RequestException:
+            # Safeway's search endpoint has been observed to silently hang
+            # (0 bytes back) for non-browser clients, rather than a clean
+            # rejection -- treat any transport-level failure the same as an
+            # explicit Incapsula challenge.
+            return self._browser_fetcher(full_url, headers)
+
+        if response.status_code in (401, 403) and is_incapsula_challenge(response.text):
+            return self._browser_fetcher(full_url, headers)
         if response.status_code in (401, 403):
             raise SubscriptionKeyError(
                 "Safeway rejected the subscription key -- it likely needs to be "
