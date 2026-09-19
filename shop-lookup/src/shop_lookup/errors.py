@@ -68,9 +68,12 @@ class SubscriptionKeyError(ShopLookupError):
 class BrowserBlockedError(ShopLookupError):
     """The real-browser fallback fetch was also met with an Incapsula challenge.
 
-    Distinct from SubscriptionKeyError: the key may be fine -- this is
-    Incapsula risk-scoring the browser's own IP/session, not rejecting the
-    key itself. Retrying immediately with the same key is unlikely to help.
+    Distinct from SubscriptionKeyError: the key is likely fine. Incapsula
+    gates this on a device-fingerprint cookie (`reese84`) that a fresh
+    browser context takes a moment of real page-load time to compute --
+    _launch_and_fetch waits for it before firing the real request, so
+    seeing this error means that wait still wasn't enough (or the cookie
+    mechanism itself has changed).
     """
 
     exit_code = 6

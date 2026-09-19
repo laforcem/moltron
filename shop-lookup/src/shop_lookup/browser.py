@@ -14,6 +14,15 @@ _CANDIDATES = ("chromium", "chromium-browser", "google-chrome", "google-chrome-s
 
 _INCAPSULA_MARKERS = ("_Incapsula_Resource", "Incapsula incident ID")
 
+# Incapsula's device-fingerprint cookie. It's set by a JS challenge that runs
+# after page load and takes a moment of real execution time to complete --
+# firing the real fetch before it's set gets a 403 regardless of IP or
+# headless/headed mode (confirmed live: a fresh single-shot browser context
+# fails every time, while a long-lived context that already has this cookie
+# succeeds).
+_FINGERPRINT_COOKIE = "reese84"
+_FINGERPRINT_COOKIE_TIMEOUT_MS = 5000
+
 
 def find_chromium_executable() -> str:
     override = os.environ.get(_ENV_VAR)
@@ -62,6 +71,7 @@ def _launch_and_fetch(  # pragma: no cover -- real-browser boundary, not unit-te
 ) -> dict:
     import json
 
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -69,6 +79,13 @@ def _launch_and_fetch(  # pragma: no cover -- real-browser boundary, not unit-te
         try:
             page = browser.new_page()
             page.goto(bootstrap_url)
+            try:
+                page.wait_for_function(
+                    f"document.cookie.includes('{_FINGERPRINT_COOKIE}=')",
+                    timeout=_FINGERPRINT_COOKIE_TIMEOUT_MS,
+                )
+            except PlaywrightTimeoutError:
+                pass  # best-effort -- the Incapsula check below still catches a real block
             body = page.evaluate(
                 """async ({url, headers}) => {
                     const response = await fetch(url, {headers});
@@ -81,7 +98,7 @@ def _launch_and_fetch(  # pragma: no cover -- real-browser boundary, not unit-te
 
     if is_incapsula_challenge(body):
         raise BrowserBlockedError(
-            "Real-browser fetch was also blocked by Incapsula -- likely "
-            "IP/session reputation, not the subscription key"
+            "Real-browser fetch was still blocked by Incapsula after waiting "
+            "for the device-fingerprint cookie to be set"
         )
     return json.loads(body)

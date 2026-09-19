@@ -20,12 +20,35 @@ dependency of the library, not of a separate service.
 1. Launch headless Chromium (system browser, via `executable_path`).
 2. Navigate to `https://www.safeway.com/` once, to let it solve Incapsula's
    challenge naturally.
-3. From that same page, run the actual `fetch()` via `page.evaluate` — this
+3. Wait (up to a few seconds) for the `reese84` cookie to appear before
+   firing the real request — see "The `reese84` cookie" below. A fresh
+   context that fires the fetch immediately after `goto()` gets a 403 every
+   time, regardless of IP or headless/headed mode.
+4. From that same page, run the actual `fetch()` via `page.evaluate` — this
    inherits whatever context Incapsula is checking. Confirmed repeatable:
    5/5 calls succeeded across different BPNs from one page load,
    ~300-450ms/call after the initial page load (that initial load, plus
    browser startup, is the real per-invocation cost — a few seconds).
-4. Close the browser.
+5. Close the browser.
+
+## The `reese84` cookie
+
+Incapsula gates access on a device-fingerprint cookie, `reese84`, set by a JS
+challenge that runs after page load and takes real execution time to
+complete — it is not set immediately on `goto()` returning. Confirmed live:
+a long-lived browser context that had accumulated this cookie over several
+real page loads succeeded, while a fresh single-shot context (headless
+*and* headed, same IP, same moment) failed identically every time. An
+earlier theory that this was IP/session reputation from cumulative request
+volume was tested and ruled out — a human's own manual browsing from the
+same IP at the same time worked fine, which reputation-based blocking
+wouldn't allow.
+
+`browser.py`'s `_launch_and_fetch` now polls for `reese84` (via
+`page.wait_for_function`, capped at `_FINGERPRINT_COOKIE_TIMEOUT_MS`) before
+firing the real fetch. If the cookie still isn't set in time, it proceeds
+anyway — the existing `is_incapsula_challenge()` check on the response
+catches a real block and raises `BrowserBlockedError`.
 
 ## Manual escape hatch
 
