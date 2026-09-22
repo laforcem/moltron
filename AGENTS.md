@@ -42,6 +42,10 @@ Full details in README — don't duplicate here, but the short version: `moltron
 - Delegated coding work goes through `sessions_spawn` with `runtime: "acp"` targeting the Claude ACP adapter (genuine Claude Code sessions, `resumeSessionId` for cross-device handoff). Whether an ACP-spawned session interoperates with Claude Code's own Remote Control feature is **unverified** — active work on this lives on the `issue-17-acp-remote-control` branch/worktree.
 - Model choices (main agent model, image model, embedding backend for memory search) are live config, not fixed architecture — the running OpenClaw config on `valet` is the source of truth, not this file or even `ansible/roles/openclaw` (not everything is Ansible-managed).
 
+## CLI tools (`ansible/roles/cli-tools`)
+
+Baseline CLI utilities (`jq`, `curl`, `wget`, `ripgrep`, `tree`, `htop`, `unzip`, `rsync`, `less`, `vim`) the agent shells out to via `exec`. Deliberately kept out of `homelab`'s `common` role: that role is every-host/human-service-generic, while this list is specifically what an AI agent's `exec` calls tend to reach for — scoped to `valet` only, in this repo.
+
 ## Media tools (`ansible/roles/media-tools`)
 
 Deliberately raw binaries, not ClawHub skills/plugins — evaluated the skill ecosystem (`docs.openclaw.ai`, ClawHub) for YouTube download/transcript/search and decided against it: no single skill covered download+transcript+search without also pulling in a third-party OAuth proxy or Google Cloud credentials, a bigger trust/credential footprint than this repo's per-service-scoped-secret convention warrants for what `exec` plus two CLI tools can already do.

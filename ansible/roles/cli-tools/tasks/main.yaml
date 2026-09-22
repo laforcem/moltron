@@ -1,0 +1,19 @@
+# Basic CLI utilities the agent shells out to via `exec` — assumed present
+# on a mature system for a human, but not guaranteed on a minimal cloud-init
+# Debian image, and not something homelab's `common` role (every host,
+# human/service-generic) is the right place for.
+- name: Install baseline CLI tools
+  ansible.builtin.apt:
+    name:
+      - jq
+      - curl
+      - wget
+      - ripgrep
+      - tree
+      - htop
+      - unzip
+      - rsync
+      - less
+      - vim
+    state: present
+    update_cache: true
