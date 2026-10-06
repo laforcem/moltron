@@ -55,6 +55,14 @@ Deliberately raw binaries, not ClawHub skills/plugins — evaluated the skill ec
 - No YouTube search/comments capability yet — `yt-dlp "ytsearchN:query" --dump-json` covers basic search without extra credentials if/when that's wanted; not wired up as of this writing.
 - Verified end-to-end on `secretary` (since renamed to `valet`) 2026-09-11: real YouTube download via `yt-dlp`, JS challenge solved via deno (`[jsc:deno] Solving JS challenges using deno` in the log), output validated with `ffprobe`.
 
+## PDF tools (`ansible/roles/pdf-tools`)
+
+apt packages the agent's `exec` calls reach for on PDFs: `poppler-utils` (`pdftotext`, `pdftoppm`, `pdfinfo`), `qpdf` (merge/split/rotate/decrypt/repair), `mupdf-tools` (`mutool`), `ocrmypdf` + `tesseract-ocr` (OCR scanned PDFs).
+
+## rdt-cli (`ansible/roles/rdt-cli`)
+
+Reddit CLI, installed as a `uv tool` under `moltron` (`/home/moltron/.local/bin/rdt`). The role also bootstraps `uv` itself as a standalone binary in `/home/moltron/.local/bin` if missing. Reddit session-cookie auth (`~/.config/rdt-cli/credential.json`) is set up by hand on `valet`, not by Ansible. Update on demand: `uv tool upgrade rdt-cli`.
+
 ## Browser automation (`ansible/roles/browser-tools`)
 
 OpenClaw's built-in browser tool (`docs.openclaw.ai/tools/browser`, bundled by default — not a ClawHub skill) gives the agent Chromium-driven browser automation: tab control, click/type/drag/select, snapshots, screenshots, PDFs. It auto-detects an existing Chromium-based browser on the host (search order: system default → Chrome → Brave → Edge → Chromium → Chrome Canary, per `/tools/browser/configuration`) rather than downloading its own binary, so a binary has to exist on `valet` first. On headless Linux with no display server, local managed profiles default to headless automatically — no Xvfb needed (unlike the Obsidian/Relay tradeoff below).

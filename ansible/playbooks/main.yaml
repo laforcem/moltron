@@ -13,5 +13,7 @@
     - openclaw
     - obsidian-headless
     - media-tools
+    - pdf-tools
+    - rdt-cli
     - browser-tools
     - rclone-dropbox
