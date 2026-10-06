@@ -1,0 +1,30 @@
+# rdt-cli (Reddit CLI) installed as a uv tool under moltron. uv itself is a
+# standalone binary in moltron's ~/.local/bin, same convention as yt-dlp/deno.
+# Reddit auth (session cookie) is credential setup done by hand on the box,
+# not managed here.
+- name: Create moltron bin directory
+  become: true
+  become_user: moltron
+  ansible.builtin.file:
+    path: /home/moltron/.local/bin
+    state: directory
+    mode: "0755"
+
+- name: Install uv (standalone binary) if missing
+  become: true
+  become_user: moltron
+  ansible.builtin.unarchive:
+    src: https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz
+    dest: /home/moltron/.local/bin
+    remote_src: true
+    extra_opts: [--strip-components=1]
+    creates: /home/moltron/.local/bin/uv
+
+- name: Install rdt-cli
+  become: true
+  become_user: moltron
+  ansible.builtin.command:
+    cmd: /home/moltron/.local/bin/uv tool install rdt-cli
+    creates: /home/moltron/.local/bin/rdt
+  environment:
+    PATH: /home/moltron/.local/bin:/usr/local/bin:/usr/bin:/bin

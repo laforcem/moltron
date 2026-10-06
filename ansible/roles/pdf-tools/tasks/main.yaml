@@ -1,0 +1,15 @@
+# PDF reading/manipulation the agent shells out to via `exec`.
+# poppler-utils: pdftotext/pdftoppm/pdfimages/pdfinfo (extract text, render pages)
+# qpdf: merge/split/rotate/encrypt/decrypt/repair
+# mupdf-tools: mutool (render, extract, clean)
+# ocrmypdf + tesseract-ocr: make scanned PDFs searchable
+- name: Install PDF tools
+  ansible.builtin.apt:
+    name:
+      - poppler-utils
+      - qpdf
+      - mupdf-tools
+      - ocrmypdf
+      - tesseract-ocr
+    state: present
+    update_cache: true
