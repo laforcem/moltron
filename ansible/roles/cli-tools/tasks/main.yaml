@@ -2,6 +2,8 @@
 # on a mature system for a human, but not guaranteed on a minimal cloud-init
 # Debian image, and not something homelab's `common` role (every host,
 # human/service-generic) is the right place for.
+# sqlite3: SQLite CLI. libimage-exiftool-perl: `exiftool` (read/write image
+# metadata). exif: lightweight EXIF-only reader/editor.
 - name: Install baseline CLI tools
   ansible.builtin.apt:
     name:
@@ -15,5 +17,8 @@
       - rsync
       - less
       - vim
+      - sqlite3
+      - libimage-exiftool-perl
+      - exif
     state: present
     update_cache: true
