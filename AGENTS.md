@@ -44,7 +44,7 @@ Full details in README — don't duplicate here, but the short version: `moltron
 
 ## CLI tools (`ansible/roles/cli-tools`)
 
-Baseline CLI utilities (`jq`, `curl`, `wget`, `ripgrep`, `tree`, `htop`, `unzip`, `rsync`, `less`, `vim`) the agent shells out to via `exec`. Deliberately kept out of `homelab`'s `common` role: that role is every-host/human-service-generic, while this list is specifically what an AI agent's `exec` calls tend to reach for — scoped to `valet` only, in this repo.
+Baseline CLI utilities (`jq`, `curl`, `wget`, `ripgrep`, `tree`, `htop`, `unzip`, `rsync`, `less`, `vim`, `sqlite3`, `exiftool` via `libimage-exiftool-perl`, `exif`) the agent shells out to via `exec`. Deliberately kept out of `homelab`'s `common` role: that role is every-host/human-service-generic, while this list is specifically what an AI agent's `exec` calls tend to reach for — scoped to `valet` only, in this repo.
 
 ## Media tools (`ansible/roles/media-tools`)
 
