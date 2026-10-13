@@ -17,7 +17,8 @@ Sibling checkout assumed: this repo and `homelab` are expected side by side (see
 
 ## Host
 
-- **valet** (`192.168.10.14`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (mirrors `terraform/warden.tf`: 2 vCPU / 4GB RAM / 32GB disk, Debian 13 cloud-init template VMID 103). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
+- **valet** (`192.168.10.14`, VLAN 10) — the only host this repo configures. Provisioned/hardened by `homelab` (live: 4 vCPU / 16GB RAM / 32GB disk, VMID 105, Debian 13 from cloud-init template VMID 103; `homelab`'s `terraform/valet.tf` still says 2 vCPU / 8GB, so it has drifted). Ansible in this repo connects over the LAN address directly; day-to-day admin happens over Tailscale instead (the break-glass path — SSH, OpenClaw Control UI, debugging — not the everyday interface).
+- **Kernel pinned to 6.12.107** (GRUB default set to that entry, `linux-image-amd64` on `apt-mark hold`): 6.12.111 corrupted guest memory and wedged the VM. Both are box-managed, not Ansible. Lift the hold only once Debian ships a 6.12 build newer than .111, and test it. `kernel.panic_on_oops=1` / `kernel.panic=10` (`/etc/sysctl.d/90-panic-reboot.conf`) make a kernel oops reboot the VM instead of hanging it.
 - A dedicated, non-`malc` Unix service user (`moltron`) runs OpenClaw on that host, created by this repo's Ansible (workload-specific, not something `homelab`'s `common` role provides).
 
 ## Secrets
