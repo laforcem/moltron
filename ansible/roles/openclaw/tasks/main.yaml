@@ -4,10 +4,13 @@
   args:
     creates: /etc/apt/sources.list.d/nodesource.list
 
+# latest, not present: `openclaw update` refuses to run when Node is below the
+# new release's floor (2026.10.8 needs >=24.22.1), and unattended-upgrades only
+# takes Debian security updates, never nodesource's.
 - name: Install nodejs
   ansible.builtin.apt:
     name: nodejs
-    state: present
+    state: latest
     update_cache: true
 
 - name: Install dbus-user-session (required for systemd --user gateway install)
@@ -44,6 +47,25 @@
     - 'openclaw config set channels.telegram.dmPolicy "allowlist"'
     - 'openclaw config set channels.telegram.allowFrom ''["{{ telegram_allowed_user_id }}"]'''
   notify: Restart openclaw gateway
+
+# Without a cap, a leak in the gateway or anything it spawns (MCP servers,
+# llama-server, Codex) fills the whole VM and thrashes it, since valet has no
+# swap. With one, the kernel OOM-kills inside this unit only and systemd
+# restarts the gateway. A drop-in, so `openclaw gateway install` rewriting the
+# main unit doesn't remove it.
+- name: Cap the gateway unit's memory
+  ansible.builtin.copy:
+    dest: /home/moltron/.config/systemd/user/openclaw-gateway.service.d/memory.conf
+    owner: moltron
+    group: moltron
+    mode: "0644"
+    content: |
+      [Service]
+      MemoryHigh=11G
+      MemoryMax=12G
+  notify:
+    - Reload moltron systemd
+    - Restart openclaw gateway
 
 - name: Bind gateway to LAN for mobile app pairing
   become: true

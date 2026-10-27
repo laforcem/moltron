@@ -1,3 +1,13 @@
+- name: Reload moltron systemd
+  become: true
+  become_user: moltron
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd.moltron[1] }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.getent_passwd.moltron[1] }}/bus"
+  ansible.builtin.systemd:
+    scope: user
+    daemon_reload: true
+
 - name: Restart openclaw gateway
   become: true
   become_user: moltron

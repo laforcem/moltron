@@ -4,7 +4,8 @@ import * as net from "node:net";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 const TOKEN_HEADER = "x-moltron-guard-token";
 const DEFAULT_ENV_PASSTHROUGH = ["PATH", "HOME", "LANG", "TMPDIR"];
@@ -28,14 +29,26 @@ function resolveSecretOrFail(entry, serverName, health, logger) {
   health?.reportFailure(new Error(message));
   return void 0;
 }
-function checkAllowedHost(secretStoreId, requiredHost, serverName, logger) {
+const execFileAsync = promisify(execFile);
+let storeListing;
+function readStoreEntries() {
+  if (!storeListing || Date.now() - storeListing.at > 3e4) {
+    const entries = execFileAsync(
+      process.execPath,
+      [process.argv[1], "secrets", "store", "list", "--json"],
+      { encoding: "utf8", timeout: 3e4 }
+    ).then(({ stdout }) => JSON.parse(stdout));
+    entries.catch(() => {
+      storeListing = void 0;
+    });
+    storeListing = { at: Date.now(), entries };
+  }
+  return storeListing.entries;
+}
+async function checkAllowedHost(secretStoreId, requiredHost, serverName, logger) {
   let entries;
   try {
-    const raw = execFileSync(process.execPath, [process.argv[1], "secrets", "store", "list", "--json"], {
-      encoding: "utf8",
-      timeout: 1e4
-    });
-    entries = JSON.parse(raw);
+    entries = await readStoreEntries();
   } catch (error) {
     logger.error(
       `moltron-mcp-guard: "${serverName}" could not read the secret store's allowed-hosts list: ${String(error)}`
@@ -73,10 +86,10 @@ function buildChildEnv(entry, secret) {
   env[entry.envVar] = secret;
   return env;
 }
-function startNetworkServer(serverName, entry, ctx) {
+async function startNetworkServer(serverName, entry, ctx) {
   const upstream = new URL(entry.upstreamUrl);
   const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
-  const hostAllowed = checkAllowedHost(entry.secretStoreId, upstream.hostname, serverName, ctx.logger);
+  const hostAllowed = await checkAllowedHost(entry.secretStoreId, upstream.hostname, serverName, ctx.logger);
   if (resolved && !hostAllowed) {
     ctx.serviceHealth?.reportFailure(
       new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`)
@@ -172,9 +185,9 @@ function readTokenLine(connection, onResult) {
   };
   connection.on("data", onData);
 }
-function startLocalProgramServer(serverName, entry, ctx) {
+async function startLocalProgramServer(serverName, entry, ctx) {
   const resolved = resolveSecretOrFail(entry, serverName, ctx.serviceHealth, ctx.logger);
-  const hostAllowed = entry.expectedHost ? checkAllowedHost(entry.secretStoreId, entry.expectedHost, serverName, ctx.logger) : true;
+  const hostAllowed = entry.expectedHost ? await checkAllowedHost(entry.secretStoreId, entry.expectedHost, serverName, ctx.logger) : true;
   if (resolved && !hostAllowed) {
     ctx.serviceHealth?.reportFailure(
       new Error(`moltron-mcp-guard: "${serverName}" host not on the secret's allowed-hosts list`)
@@ -187,6 +200,7 @@ function startLocalProgramServer(serverName, entry, ctx) {
   const socketPath = path.join(socketDir, `${serverName}.sock`);
   fs.rmSync(socketPath, { force: true });
   const liveChildren = /* @__PURE__ */ new Set();
+  const stopChild = /* @__PURE__ */ new WeakMap();
   const server = net.createServer((connection) => {
     connection.on("error", (error) => {
       ctx.logger.error(`moltron-mcp-guard: "${serverName}" connection error: ${String(error)}`);
@@ -218,10 +232,13 @@ function startLocalProgramServer(serverName, entry, ctx) {
       connection.pipe(child.stdin);
       child.stdout.pipe(connection);
       const startedAt = Date.now();
-      child.on("exit", (code) => {
+      let stoppedByGuard = false;
+      child.on("exit", (code, signal) => {
         liveChildren.delete(child);
         connection.destroy();
-        if (code === 0) {
+        if (stoppedByGuard) {
+          ctx.logger.debug?.(`moltron-mcp-guard: "${serverName}" stopped (${signal ?? `code ${code}`})`);
+        } else if (code === 0) {
           ctx.serviceHealth?.clearFailure();
         } else if (Date.now() - startedAt < 1e4) {
           const message = `moltron-mcp-guard: "${serverName}" exited during startup (code ${code}) \u2014 likely a rejected credential or misconfiguration. Last output: ${stderrTail.trim() || "(none)"}`;
@@ -241,7 +258,12 @@ function startLocalProgramServer(serverName, entry, ctx) {
         connection.destroy();
       });
       connection.on("close", () => {
-        if (!child.killed) child.kill();
+        if (child.exitCode !== null || child.signalCode !== null) return;
+        stoppedByGuard = true;
+        child.kill();
+      });
+      stopChild.set(child, () => {
+        stoppedByGuard = true;
       });
     });
   });
@@ -261,6 +283,7 @@ function startLocalProgramServer(serverName, entry, ctx) {
       server.close();
       fs.rmSync(socketPath, { force: true });
       for (const child of liveChildren) {
+        stopChild.get(child)?.();
         if (!child.killed) child.kill();
       }
       liveChildren.clear();
@@ -277,12 +300,14 @@ var index_default = definePluginEntry({
     );
     for (const serverName of Object.keys(entries)) {
       let handle;
+      let generation = 0;
       api.registerService({
         id: `moltron-mcp-guard:${serverName}`,
         reload: {
           configPrefixes: [`plugins.entries.moltron-mcp-guard.config.servers.${serverName}`]
         },
-        start(ctx) {
+        async start(ctx) {
+          const startGeneration = ++generation;
           const entry = readEntryFromConfig(ctx, serverName);
           if (!entry) {
             const message = `moltron-mcp-guard: "${serverName}" has no valid config entry`;
@@ -290,9 +315,15 @@ var index_default = definePluginEntry({
             ctx.serviceHealth?.reportFailure(new Error(message));
             return;
           }
-          handle = entry.kind === "network" ? startNetworkServer(serverName, entry, ctx) : startLocalProgramServer(serverName, entry, ctx);
+          const started = entry.kind === "network" ? await startNetworkServer(serverName, entry, ctx) : await startLocalProgramServer(serverName, entry, ctx);
+          if (startGeneration !== generation) {
+            started.close();
+            return;
+          }
+          handle = started;
         },
         stop() {
+          generation++;
           handle?.close();
           handle = void 0;
         }
